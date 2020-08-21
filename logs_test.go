@@ -33,3 +33,27 @@ func TestLogger(t *testing.T) {
 	}
 	Flush()
 }
+
+func TestNew(t *testing.T) {
+	applog := NewLogger("logs/xxx.log")
+	defer applog.Flush()
+	// 设置日志输出等级
+	// 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
+	applog.SetLevel(DEBUG)
+	// 设置输出调用信息
+	applog.SetCallInfo(true)
+	// 设置同时显示到控制台
+	// 默认只输出到文件
+	// applog.SetConsole(true)
+	applog.Debug("Debug Logger")
+	applog.Debugf("Debugf %s", "Logger")
+
+	applog.Info("Info Logger")
+	applog.Infof("Infof %s", "Logger")
+
+	applog.Warn("Warn Logger")
+	applog.Warnf("Warnf %s", "Logger")
+
+	applog.Error("Error Logger")
+	applog.Errorf("Errorf %s", "Logger")
+}
