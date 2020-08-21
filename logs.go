@@ -40,9 +40,9 @@ func (lv logLevel) Str() string {
 type FishLogger struct {
 	cons     bool          // 标准输出  默认 false
 	callInfo bool          // 是否输出行号和文件名 默认 false
-	maxAge   int           // 最大天数
+	maxAge   int           // 最大保留天数
 	maxSize  int64         // 单个日志最大容量 默认 256MB
-	size     int64         // 累计大小
+	size     int64         // 累计大小 无后缀
 	lpath    string        // 文件目录 完整路径 lpath=lname+lsuffix
 	lname    string        // 文件名
 	lsuffix  string        // 文件后缀名 默认 .log
