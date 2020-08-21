@@ -32,9 +32,12 @@ type FishLogger struct {
 
 ### 使用示例
 ``` golang
+package main
+
 import "github.com/zxysilent/logs"
+
 func main() {
-    // 使用默认实例
+	// 使用默认实例
 	// 退出时调用，确保日志写入文件中
 	defer logs.Flush()
 	// 设置日志输出等级
@@ -86,7 +89,8 @@ func main() {
 
 	//applog.Fatal("Fatal Logger")
 	//applog.Fatalf("Fatalf %s", "Logger")
- }
+}
+
 ```
 
  ### 性能 
