@@ -395,7 +395,7 @@ func Fatal(args ...interface{}) {
 	os.Exit(0)
 }
 func Fatalf(format string, args ...interface{}) {
-	fish.Fatalf(format, args...)
+	fish.printf(FATAL, format, args...)
 	os.Exit(0)
 }
 
