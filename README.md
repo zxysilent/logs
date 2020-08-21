@@ -35,17 +35,17 @@ type FishLogger struct {
 import "github.com/zxysilent/logs"
 func main() {
     // 使用默认实例
-    // 退出时调用，确保日志写入文件中
-    defer logs.Flush()
-    // 设置日志输出等级
-    // 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
-    logs.SetLevel(logs.DEBUG)
-    // 设置输出调用信息
-    logs.SetCallInfo(true)
-    // 设置同时显示到控制台 
-    // 默认只输出到文件
-    logs.SetConsole(true)
-    logs.Debug("Debug Logger")
+	// 退出时调用，确保日志写入文件中
+	defer logs.Flush()
+	// 设置日志输出等级
+	// 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
+	logs.SetLevel(logs.DEBUG)
+	// 设置输出调用信息
+	logs.SetCallInfo(true)
+	// 设置同时显示到控制台
+	// 默认只输出到文件
+	logs.SetConsole(true)
+	logs.Debug("Debug Logger")
 	logs.Debugf("Debugf %s", "Logger")
 
 	logs.Info("Info Logger")
@@ -57,22 +57,22 @@ func main() {
 	logs.Error("Error Logger")
 	logs.Errorf("Errorf %s", "Logger")
 
-  	//logs.Fatal("Fatal Logger")
-    //logs.Fatalf("Fatalf %s", "Logger")
-    
-    // ------------------------- 使用自定义实例
-    // 适用于不同业务模块
-    applog:=logs.NewLogger("logs/xxx.log")
-    defer applog.Flush()
-    // 设置日志输出等级
-    // 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
-    applog.SetLevel(logs.DEBUG)
-    // 设置输出调用信息
-    applog.SetCallInfo(true)
-    // 设置同时显示到控制台 
-    // 默认只输出到文件
-    applog.SetConsole(true)
-    applog.Debug("Debug Logger")
+	//logs.Fatal("Fatal Logger")
+	//logs.Fatalf("Fatalf %s", "Logger")
+
+	// ------------------------- 使用自定义实例
+	// 适用于不同业务模块
+	applog := logs.NewLogger("logs/xxx.log")
+	defer applog.Flush()
+	// 设置日志输出等级
+	// 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
+	applog.SetLevel(logs.DEBUG)
+	// 设置输出调用信息
+	applog.SetCallInfo(true)
+	// 设置同时显示到控制台
+	// 默认只输出到文件
+	applog.SetConsole(true)
+	applog.Debug("Debug Logger")
 	applog.Debugf("Debugf %s", "Logger")
 
 	applog.Info("Info Logger")
@@ -84,7 +84,7 @@ func main() {
 	applog.Error("Error Logger")
 	applog.Errorf("Errorf %s", "Logger")
 
-  	//applog.Fatal("Fatal Logger")
+	//applog.Fatal("Fatal Logger")
 	//applog.Fatalf("Fatalf %s", "Logger")
  }
 ```
