@@ -97,7 +97,9 @@ func Flush() {
 
 // 写入文件
 func (fl *FishLogger) Flush() {
-	fl.lockFlush()
+	fl.lock.Lock()
+	fl.flushSync()
+	fl.lock.Unlock()
 }
 func SetCallInfo(b bool) {
 	fish.SetCallInfo(b)
@@ -279,16 +281,11 @@ func (fl *FishLogger) delete() {
 // 定时写入文件
 func (fl *FishLogger) daemon() {
 	for range time.NewTicker(flushInterval).C {
-		fl.lockFlush()
+		fl.Flush()
 	}
 }
 
-func (fl *FishLogger) lockFlush() {
-	fl.lock.Lock()
-	fl.flushSync()
-	fl.lock.Unlock()
-}
-
+// 不能锁
 func (fl *FishLogger) flushSync() {
 	if fl.file != nil {
 		fl.writer.Flush() // 写入底层数据
@@ -395,9 +392,11 @@ func Errorf(format string, args ...interface{}) {
 
 func Fatal(args ...interface{}) {
 	fish.println(FATAL, args...)
+	os.Exit(0)
 }
 func Fatalf(format string, args ...interface{}) {
 	fish.Fatalf(format, args...)
+	os.Exit(0)
 }
 
 // -------- 实例 自定义
