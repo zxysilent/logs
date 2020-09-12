@@ -312,8 +312,10 @@ func (fl *FishLogger) rotate() error {
 		fl.size = 0
 	}
 	finfo, err := os.Stat(fl.lpath)
+	fl.created = now.Format("2006/01/02")
 	if err == nil {
 		fl.size = finfo.Size()
+		fl.created = finfo.ModTime().Format("2006/01/02")
 	}
 	fout, err := os.OpenFile(fl.lpath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
@@ -321,7 +323,7 @@ func (fl *FishLogger) rotate() error {
 	}
 	fl.file = fout
 	fl.writer = bufio.NewWriterSize(fl.file, bufferSize)
-	fl.created = now.Format("2006/01/02")
+
 	return nil
 }
 
