@@ -132,7 +132,6 @@ func (fl *FishLogger) SetConsole(b bool) {
 func (fl *FishLogger) header(lv logLevel, depth int) *buffer {
 	now := time.Now()
 	buf := fl.pool.Get().(*buffer)
-	buf.Reset()
 	year, month, day := now.Date()
 	hour, minute, second := now.Clock()
 	// format yyyymmdd hh:mm:ss.uuuu [DIWEF] file:line] msg
@@ -230,6 +229,7 @@ func (fl *FishLogger) write(lv logLevel, buf *buffer) {
 	if err != nil {
 		fl.exit(err)
 	}
+	buf.Reset()
 	fl.pool.Put(buf)
 }
 
@@ -299,14 +299,12 @@ func (fl *FishLogger) rotate() error {
 	}
 	fl.file = fout
 	fl.writer = bufio.NewWriterSize(fl.file, bufferSize)
-
 	return nil
 }
 
 type buffer struct {
 	temp [64]byte
 	bytes.Buffer
-	next *buffer
 }
 
 func (buf *buffer) write2(i, d int) {
