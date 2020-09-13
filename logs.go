@@ -48,8 +48,7 @@ type FishLogger struct {
 	lsuffix  string        // 文件后缀名 默认 .log
 	created  string        // 文件创建日期
 	level    logLevel      // 输出的日志等级
-	list     *buffer       // 缓存
-	listLock sync.Mutex    // 链表🔒
+	pool     sync.Pool     // Pool
 	lock     sync.Mutex    // logger🔒
 	writer   *bufio.Writer // 缓存io 缓存到文件
 	file     *os.File      // 日志文件
@@ -71,6 +70,11 @@ func NewLogger(lpath string) *FishLogger {
 	os.MkdirAll(filepath.Dir(lpath), 0666)
 	fl.level = DEBUG
 	fl.maxSize = maxSize
+	fl.pool = sync.Pool{
+		New: func() interface{} {
+			return new(buffer)
+		},
+	}
 	go fl.daemon()
 	return fl
 }
@@ -124,39 +128,11 @@ func (fl *FishLogger) SetConsole(b bool) {
 	fl.lock.Unlock()
 }
 
-// 获取缓存
-func (l *FishLogger) getBuffer() *buffer {
-	l.listLock.Lock()
-	b := l.list
-	if b != nil {
-		l.list = b.next
-	}
-	l.listLock.Unlock()
-	if b == nil {
-		b = new(buffer)
-	} else {
-		b.next = nil
-		b.Reset()
-	}
-	return b
-}
-
-// 放回缓存
-func (fl *FishLogger) putBuffer(b *buffer) {
-	// 大缓存等待gc
-	if b.Len() >= 128 {
-		return
-	}
-	fl.listLock.Lock()
-	b.next = fl.list
-	fl.list = b
-	fl.listLock.Unlock()
-}
-
 // 生成日志头信息
 func (fl *FishLogger) header(lv logLevel, depth int) *buffer {
 	now := time.Now()
-	buf := fl.getBuffer()
+	buf := fl.pool.Get().(*buffer)
+	buf.Reset()
 	year, month, day := now.Date()
 	hour, minute, second := now.Clock()
 	// format yyyymmdd hh:mm:ss.uuuu [DIWEF] file:line] msg
@@ -254,7 +230,7 @@ func (fl *FishLogger) write(lv logLevel, buf *buffer) {
 	if err != nil {
 		fl.exit(err)
 	}
-	fl.putBuffer(buf)
+	fl.pool.Put(buf)
 }
 
 // 删除旧日志
