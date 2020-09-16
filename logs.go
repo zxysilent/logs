@@ -276,7 +276,6 @@ func (fl *FishLogger) delete() {
 // 定时写入文件
 func (fl *FishLogger) daemon() {
 	for range time.NewTicker(flushInterval).C {
-		fl.Debug("Debug Loggerxx")
 		fl.Flush()
 	}
 }
