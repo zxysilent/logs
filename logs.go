@@ -21,6 +21,7 @@ const (
 	WARN
 	ERROR
 	FATAL
+	maxAge        = 180               // 180 天
 	maxSize       = 1024 * 1024 * 256 // 256 MB
 	bufferSize    = 1024 * 256        // 256 KB
 	digits        = "0123456789"
@@ -69,6 +70,7 @@ func NewLogger(lpath string) *FishLogger {
 	}
 	os.MkdirAll(filepath.Dir(lpath), 0666)
 	fl.level = DEBUG
+	fl.maxAge = maxAge
 	fl.maxSize = maxSize
 	fl.pool = sync.Pool{
 		New: func() interface{} {
@@ -91,6 +93,20 @@ func (fl *FishLogger) SetLevel(lv logLevel) {
 	}
 	fl.lock.Lock()
 	fl.level = lv
+	fl.lock.Unlock()
+}
+
+// 设置最大保存天数
+// 小于0不删除
+func SetMaxAge(ma int) {
+	fish.SetMaxAge(ma)
+}
+
+// 设置最大保存天数
+// 小于0不删除
+func (fl *FishLogger) SetMaxAge(ma int) {
+	fl.lock.Lock()
+	fl.maxAge = ma
 	fl.lock.Unlock()
 }
 
@@ -235,6 +251,9 @@ func (fl *FishLogger) write(lv logLevel, buf *buffer) {
 
 // 删除旧日志
 func (fl *FishLogger) delete() {
+	if fl.maxAge < 0 {
+		return
+	}
 	dir := filepath.Dir(fl.lpath)
 	fakeNow := time.Now().AddDate(0, 0, -fl.maxAge)
 	filepath.Walk(dir, func(fpath string, info os.FileInfo, err error) error {
@@ -257,6 +276,7 @@ func (fl *FishLogger) delete() {
 // 定时写入文件
 func (fl *FishLogger) daemon() {
 	for range time.NewTicker(flushInterval).C {
+		fl.Debug("Debug Loggerxx")
 		fl.Flush()
 	}
 }
