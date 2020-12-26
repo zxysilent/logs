@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -197,7 +198,9 @@ func (fl *FishLogger) println(lv logLevel, args ...interface{}) {
 	}
 	buf := fl.header(lv, 0)
 	fmt.Fprintln(buf, args...)
-	fl.write(lv, buf)
+	fl.Write(buf.Bytes())
+	buf.Reset()
+	fl.pool.Put(buf)
 }
 
 // 格式输出
@@ -210,43 +213,43 @@ func (fl *FishLogger) printf(lv logLevel, format string, args ...interface{}) {
 	if buf.Bytes()[buf.Len()-1] != '\n' {
 		buf.WriteByte('\n')
 	}
-	fl.write(lv, buf)
+	fl.Write(buf.Bytes())
+	buf.Reset()
+	fl.pool.Put(buf)
 }
 
 // 写入数据
-func (fl *FishLogger) write(lv logLevel, buf *buffer) {
+func (fl *FishLogger) Write(buf []byte) (n int, err error) {
 	fl.lock.Lock()
 	defer fl.lock.Unlock()
-	data := buf.Bytes()
 	if fl.cons {
-		os.Stderr.Write(data)
+		os.Stderr.Write(buf)
 	}
 	if fl.file == nil {
 		if err := fl.rotate(); err != nil {
-			os.Stderr.Write(data)
+			os.Stderr.Write(buf)
 			fl.exit(err)
 		}
 	}
 	// 按天切割
-	if fl.created != string(data[0:10]) {
+	if fl.created != string(buf[0:10]) {
 		go fl.delete() // 每天检测一次旧文件
 		if err := fl.rotate(); err != nil {
 			fl.exit(err)
 		}
 	}
 	// 按大小切割
-	if fl.size+int64(len(data)) >= fl.maxSize {
+	if fl.size+int64(len(buf)) >= fl.maxSize {
 		if err := fl.rotate(); err != nil {
 			fl.exit(err)
 		}
 	}
-	n, err := fl.writer.Write(data)
+	n, err = fl.writer.Write(buf)
 	fl.size += int64(n)
 	if err != nil {
 		fl.exit(err)
 	}
-	buf.Reset()
-	fl.pool.Put(buf)
+	return
 }
 
 // 删除旧日志
@@ -393,6 +396,9 @@ func Fatalf(format string, args ...interface{}) {
 	fish.printf(FATAL, format, args...)
 	os.Exit(0)
 }
+func Writer() io.Writer {
+	return fish
+}
 
 // -------- 实例 自定义
 
@@ -435,4 +441,8 @@ func (fl *FishLogger) Fatal(args ...interface{}) {
 func (fl *FishLogger) Fatalf(format string, args ...interface{}) {
 	fl.printf(FATAL, format, args...)
 	os.Exit(0)
+}
+
+func (fl *FishLogger) Writer() io.Writer {
+	return fl
 }
