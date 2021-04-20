@@ -163,12 +163,10 @@ func (fl *FishLogger) header(lv logLevel, depth int) *buffer {
 	buf.write2(14, minute)
 	buf.temp[16] = ':'
 	buf.write2(17, second)
-	buf.temp[19] = '.'
-	buf.write4(20, now.Nanosecond()/1e5)
-	buf.temp[24] = ' '
-	copy(buf.temp[25:28], lv.Str())
-	buf.temp[28] = ' '
-	buf.Write(buf.temp[:29])
+	buf.temp[19] = ' '
+	copy(buf.temp[20:23], lv.Str())
+	buf.temp[23] = ' '
+	buf.Write(buf.temp[:24])
 	// 调用信息
 	if fl.callInfo {
 		_, file, line, ok := runtime.Caller(3 + depth)
