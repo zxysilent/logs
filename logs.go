@@ -295,7 +295,7 @@ func (fl *FishLogger) exit(err error) {
 	os.Exit(0)
 }
 
-// rotate
+// rotate 切割文件
 func (fl *FishLogger) rotate() error {
 	now := time.Now()
 	if fl.file != nil {
