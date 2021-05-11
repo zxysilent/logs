@@ -69,7 +69,7 @@ func NewLogger(lpath string) *FishLogger {
 	if fl.lsuffix == "" {
 		fl.lsuffix = ".log"
 	}
-	os.MkdirAll(filepath.Dir(lpath), 0666)
+	os.MkdirAll(filepath.Dir(lpath), 0755)
 	fl.level = DEBUG
 	fl.maxAge = maxAge
 	fl.maxSize = maxSize
