@@ -14,7 +14,7 @@ func BenchmarkLogger(b *testing.B) {
 }
 
 func TestLogger(t *testing.T) {
-	SetCallInfo(true)
+	SetCaller(true)
 	Debug("Debug Logger")
 	Debugf("Debugf %s", "Logger")
 
@@ -39,9 +39,9 @@ func TestNew(t *testing.T) {
 	defer applog.Flush()
 	// 设置日志输出等级
 	// 开发环境下设置输出等级为DEBUG，线上环境设置为INFO
-	applog.SetLevel(DEBUG)
+	applog.SetLevel(LDEBUG)
 	// 设置输出调用信息
-	applog.SetCallInfo(true)
+	applog.SetCaller(true)
 	// 设置同时显示到控制台
 	// 默认只输出到文件
 	// applog.SetConsole(true)

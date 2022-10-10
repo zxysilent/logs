@@ -17,11 +17,11 @@ import (
 type logLevel int
 
 const (
-	DEBUG logLevel = iota
-	INFO
-	WARN
-	ERROR
-	FATAL
+	LDEBUG logLevel = iota
+	LINFO
+	LWARN
+	LERROR
+	LFATAL
 	maxAge        = 180               // 180 天
 	maxSize       = 1024 * 1024 * 256 // 256 MB
 	bufferSize    = 1024 * 256        // 256 KB
@@ -32,7 +32,7 @@ const (
 
 // 字符串等级
 func (lv logLevel) Str() string {
-	if lv >= DEBUG && lv <= FATAL {
+	if lv >= LDEBUG && lv <= LFATAL {
 		return logShort[lv*3 : lv*3+3]
 	}
 	return "[N]"
@@ -70,7 +70,7 @@ func NewLogger(lpath string) *FishLogger {
 		fl.lsuffix = ".log"
 	}
 	os.MkdirAll(filepath.Dir(lpath), 0755)
-	fl.level = DEBUG
+	fl.level = LDEBUG
 	fl.maxAge = maxAge
 	fl.maxSize = maxSize
 	fl.pool = sync.Pool{
@@ -89,7 +89,7 @@ func SetLevel(lv logLevel) {
 
 // 设置输出等级
 func (fl *FishLogger) SetLevel(lv logLevel) {
-	if lv < DEBUG || lv > FATAL {
+	if lv < LDEBUG || lv > LFATAL {
 		panic("非法的日志等级")
 	}
 	fl.lock.Lock()
@@ -122,12 +122,12 @@ func (fl *FishLogger) Flush() {
 	fl.flushSync()
 	fl.lock.Unlock()
 }
-func SetCallInfo(b bool) {
-	fish.SetCallInfo(b)
+func SetCaller(b bool) {
+	fish.SetCaller(b)
 }
 
 // 设置调用信息
-func (fl *FishLogger) SetCallInfo(b bool) {
+func (fl *FishLogger) SetCaller(b bool) {
 	fl.lock.Lock()
 	fl.callInfo = b
 	fl.lock.Unlock()
@@ -356,42 +356,42 @@ func (buf *buffer) writeN(i, d int) int {
 // -------- 实例 fish
 
 func Debug(args ...interface{}) {
-	fish.println(DEBUG, args...)
+	fish.println(LDEBUG, args...)
 }
 
 func Debugf(format string, args ...interface{}) {
-	fish.printf(DEBUG, format, args...)
+	fish.printf(LDEBUG, format, args...)
 }
 func Info(args ...interface{}) {
-	fish.println(INFO, args...)
+	fish.println(LINFO, args...)
 }
 
 func Infof(format string, args ...interface{}) {
-	fish.printf(INFO, format, args...)
+	fish.printf(LINFO, format, args...)
 }
 
 func Warn(args ...interface{}) {
-	fish.println(WARN, args...)
+	fish.println(LWARN, args...)
 }
 
 func Warnf(format string, args ...interface{}) {
-	fish.printf(WARN, format, args...)
+	fish.printf(LWARN, format, args...)
 }
 
 func Error(args ...interface{}) {
-	fish.println(ERROR, args...)
+	fish.println(LERROR, args...)
 }
 
 func Errorf(format string, args ...interface{}) {
-	fish.printf(ERROR, format, args...)
+	fish.printf(LERROR, format, args...)
 }
 
 func Fatal(args ...interface{}) {
-	fish.println(FATAL, args...)
+	fish.println(LFATAL, args...)
 	os.Exit(0)
 }
 func Fatalf(format string, args ...interface{}) {
-	fish.printf(FATAL, format, args...)
+	fish.printf(LFATAL, format, args...)
 	os.Exit(0)
 }
 func Writer() io.Writer {
@@ -401,43 +401,43 @@ func Writer() io.Writer {
 // -------- 实例 自定义
 
 func (fl *FishLogger) Debug(args ...interface{}) {
-	fl.println(DEBUG, args...)
+	fl.println(LDEBUG, args...)
 }
 
 func (fl *FishLogger) Debugf(format string, args ...interface{}) {
-	fl.printf(DEBUG, format, args...)
+	fl.printf(LDEBUG, format, args...)
 }
 func (fl *FishLogger) Info(args ...interface{}) {
-	fl.println(INFO, args...)
+	fl.println(LINFO, args...)
 }
 
 func (fl *FishLogger) Infof(format string, args ...interface{}) {
-	fl.printf(INFO, format, args...)
+	fl.printf(LINFO, format, args...)
 }
 
 func (fl *FishLogger) Warn(args ...interface{}) {
-	fl.println(WARN, args...)
+	fl.println(LWARN, args...)
 }
 
 func (fl *FishLogger) Warnf(format string, args ...interface{}) {
-	fl.printf(WARN, format, args...)
+	fl.printf(LWARN, format, args...)
 }
 
 func (fl *FishLogger) Error(args ...interface{}) {
-	fl.println(ERROR, args...)
+	fl.println(LERROR, args...)
 }
 
 func (fl *FishLogger) Errorf(format string, args ...interface{}) {
-	fl.printf(ERROR, format, args...)
+	fl.printf(LERROR, format, args...)
 }
 
 func (fl *FishLogger) Fatal(args ...interface{}) {
-	fl.println(FATAL, args...)
+	fl.println(LFATAL, args...)
 	os.Exit(0)
 }
 
 func (fl *FishLogger) Fatalf(format string, args ...interface{}) {
-	fl.printf(FATAL, format, args...)
+	fl.printf(LFATAL, format, args...)
 	os.Exit(0)
 }
 
