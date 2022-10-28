@@ -14,7 +14,7 @@
 ### 日志结构
 ``` golang
 // logger
-type FishLogger struct {
+type Logger struct {
 	cons     bool          // 标准输出  默认 false
 	callInfo bool          // 是否输出行号和文件名 默认 false
 	maxAge   int           // 最大保留天数
@@ -98,12 +98,16 @@ func main() {
 
  ### 性能 
  > 直接保存文件
+
 ```
+12th Gen Intel(R) Core(TM) i5-12500H   2.50 GHz
 goos: windows
 goarch: amd64
 pkg: github.com/zxysilent/logs
+cpu: 12th Gen Intel(R) Core(TM) i5-12500H
 BenchmarkLogger
-BenchmarkLogger-8   	 3783954	       313 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLogger-16
+11848118	       101.6 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/zxysilent/logs	1.542s
+ok  	github.com/zxysilent/logs	1.336s
 ```

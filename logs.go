@@ -39,7 +39,7 @@ func (lv logLevel) Str() string {
 }
 
 // logger
-type FishLogger struct {
+type Logger struct {
 	cons     bool          // 标准输出  默认 false
 	callInfo bool          // 是否输出行号和文件名 默认 false
 	maxAge   int           // 最大保留天数
@@ -61,8 +61,8 @@ var fish = NewLogger("logs/app.log")
 
 // NewLogger 实例化logger
 // path 日志完整路径 eg:logs/app.log
-func NewLogger(lpath string) *FishLogger {
-	fl := new(FishLogger)
+func NewLogger(lpath string) *Logger {
+	fl := new(Logger)
 	fl.lpath = lpath                                 // logs/app.log
 	fl.lsuffix = filepath.Ext(lpath)                 // .log
 	fl.lname = strings.TrimSuffix(lpath, fl.lsuffix) // logs/app
@@ -88,7 +88,7 @@ func SetLevel(lv logLevel) {
 }
 
 // 设置输出等级
-func (fl *FishLogger) SetLevel(lv logLevel) {
+func (fl *Logger) SetLevel(lv logLevel) {
 	if lv < LDEBUG || lv > LFATAL {
 		panic("非法的日志等级")
 	}
@@ -105,7 +105,7 @@ func SetMaxAge(ma int) {
 
 // 设置最大保存天数
 // 小于0不删除
-func (fl *FishLogger) SetMaxAge(ma int) {
+func (fl *Logger) SetMaxAge(ma int) {
 	fl.lock.Lock()
 	fl.maxAge = ma
 	fl.lock.Unlock()
@@ -117,7 +117,7 @@ func Flush() {
 }
 
 // 写入文件
-func (fl *FishLogger) Flush() {
+func (fl *Logger) Flush() {
 	fl.lock.Lock()
 	fl.flushSync()
 	fl.lock.Unlock()
@@ -127,7 +127,7 @@ func SetCaller(b bool) {
 }
 
 // 设置调用信息
-func (fl *FishLogger) SetCaller(b bool) {
+func (fl *Logger) SetCaller(b bool) {
 	fl.lock.Lock()
 	fl.callInfo = b
 	fl.lock.Unlock()
@@ -139,14 +139,14 @@ func SetConsole(b bool) {
 }
 
 // 设置控制台输出
-func (fl *FishLogger) SetConsole(b bool) {
+func (fl *Logger) SetConsole(b bool) {
 	fl.lock.Lock()
 	fl.cons = b
 	fl.lock.Unlock()
 }
 
 // 生成日志头信息
-func (fl *FishLogger) header(lv logLevel, depth int) *buffer {
+func (fl *Logger) header(lv logLevel, depth int) *buffer {
 	now := time.Now()
 	buf := fl.pool.Get().(*buffer)
 	year, month, day := now.Date()
@@ -190,7 +190,7 @@ func (fl *FishLogger) header(lv logLevel, depth int) *buffer {
 }
 
 // 换行输出
-func (fl *FishLogger) println(lv logLevel, args ...interface{}) {
+func (fl *Logger) println(lv logLevel, args ...interface{}) {
 	if lv < fl.level {
 		return
 	}
@@ -202,7 +202,7 @@ func (fl *FishLogger) println(lv logLevel, args ...interface{}) {
 }
 
 // 格式输出
-func (fl *FishLogger) printf(lv logLevel, format string, args ...interface{}) {
+func (fl *Logger) printf(lv logLevel, format string, args ...interface{}) {
 	if lv < fl.level {
 		return
 	}
@@ -217,7 +217,7 @@ func (fl *FishLogger) printf(lv logLevel, format string, args ...interface{}) {
 }
 
 // 写入数据
-func (fl *FishLogger) Write(buf []byte) (n int, err error) {
+func (fl *Logger) Write(buf []byte) (n int, err error) {
 	fl.lock.Lock()
 	defer fl.lock.Unlock()
 	if fl.cons {
@@ -251,7 +251,7 @@ func (fl *FishLogger) Write(buf []byte) (n int, err error) {
 }
 
 // 删除旧日志
-func (fl *FishLogger) delete() {
+func (fl *Logger) delete() {
 	if fl.maxAge < 0 {
 		return
 	}
@@ -275,28 +275,28 @@ func (fl *FishLogger) delete() {
 }
 
 // 定时写入文件
-func (fl *FishLogger) daemon() {
+func (fl *Logger) daemon() {
 	for range time.NewTicker(flushInterval).C {
 		fl.Flush()
 	}
 }
 
 // 不能锁
-func (fl *FishLogger) flushSync() {
+func (fl *Logger) flushSync() {
 	if fl.file != nil {
 		fl.writer.Flush() // 写入底层数据
 		fl.file.Sync()    // 同步到磁盘
 	}
 }
 
-func (fl *FishLogger) exit(err error) {
+func (fl *Logger) exit(err error) {
 	fmt.Fprintf(os.Stderr, "logs: exiting because of error: %s\n", err)
 	fl.flushSync()
 	os.Exit(0)
 }
 
 // rotate 切割文件
-func (fl *FishLogger) rotate() error {
+func (fl *Logger) rotate() error {
 	now := time.Now()
 	if fl.file != nil {
 		fl.writer.Flush()
@@ -400,47 +400,47 @@ func Writer() io.Writer {
 
 // -------- 实例 自定义
 
-func (fl *FishLogger) Debug(args ...interface{}) {
+func (fl *Logger) Debug(args ...interface{}) {
 	fl.println(LDEBUG, args...)
 }
 
-func (fl *FishLogger) Debugf(format string, args ...interface{}) {
+func (fl *Logger) Debugf(format string, args ...interface{}) {
 	fl.printf(LDEBUG, format, args...)
 }
-func (fl *FishLogger) Info(args ...interface{}) {
+func (fl *Logger) Info(args ...interface{}) {
 	fl.println(LINFO, args...)
 }
 
-func (fl *FishLogger) Infof(format string, args ...interface{}) {
+func (fl *Logger) Infof(format string, args ...interface{}) {
 	fl.printf(LINFO, format, args...)
 }
 
-func (fl *FishLogger) Warn(args ...interface{}) {
+func (fl *Logger) Warn(args ...interface{}) {
 	fl.println(LWARN, args...)
 }
 
-func (fl *FishLogger) Warnf(format string, args ...interface{}) {
+func (fl *Logger) Warnf(format string, args ...interface{}) {
 	fl.printf(LWARN, format, args...)
 }
 
-func (fl *FishLogger) Error(args ...interface{}) {
+func (fl *Logger) Error(args ...interface{}) {
 	fl.println(LERROR, args...)
 }
 
-func (fl *FishLogger) Errorf(format string, args ...interface{}) {
+func (fl *Logger) Errorf(format string, args ...interface{}) {
 	fl.printf(LERROR, format, args...)
 }
 
-func (fl *FishLogger) Fatal(args ...interface{}) {
+func (fl *Logger) Fatal(args ...interface{}) {
 	fl.println(LFATAL, args...)
 	os.Exit(0)
 }
 
-func (fl *FishLogger) Fatalf(format string, args ...interface{}) {
+func (fl *Logger) Fatalf(format string, args ...interface{}) {
 	fl.printf(LFATAL, format, args...)
 	os.Exit(0)
 }
 
-func (fl *FishLogger) Writer() io.Writer {
+func (fl *Logger) Writer() io.Writer {
 	return fl
 }
