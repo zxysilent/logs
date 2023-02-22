@@ -272,11 +272,11 @@ func (fl *FieldLogger) Infof(foramt string, args ...interface{}) {
 	fl.printf(LINFO, foramt, args...)
 }
 
-func (fl *FieldLogger) Wran(args ...interface{}) {
+func (fl *FieldLogger) Warn(args ...interface{}) {
 	fl.print(LWARN, args...)
 }
 
-func (fl *FieldLogger) Wranf(foramt string, args ...interface{}) {
+func (fl *FieldLogger) Warnf(foramt string, args ...interface{}) {
 	fl.printf(LWARN, foramt, args...)
 }
 func (fl *FieldLogger) Error(args ...interface{}) {
@@ -304,11 +304,11 @@ func (fl *Logger) Infof(foramt string, args ...interface{}) {
 	fl.printf(LINFO, foramt, args...)
 }
 
-func (fl *Logger) Wran(args ...interface{}) {
+func (fl *Logger) Warn(args ...interface{}) {
 	fl.print(LWARN, args...)
 }
 
-func (fl *Logger) Wranf(foramt string, args ...interface{}) {
+func (fl *Logger) Warnf(foramt string, args ...interface{}) {
 	fl.printf(LWARN, foramt, args...)
 }
 func (fl *Logger) Error(args ...interface{}) {
@@ -337,11 +337,11 @@ func Infof(foramt string, args ...interface{}) {
 	log.printf(LINFO, foramt, args...)
 }
 
-func Wran(args ...interface{}) {
+func Warn(args ...interface{}) {
 	log.print(LWARN, args...)
 }
 
-func Wranf(foramt string, args ...interface{}) {
+func Warnf(foramt string, args ...interface{}) {
 	log.printf(LWARN, foramt, args...)
 }
 func Error(args ...interface{}) {
