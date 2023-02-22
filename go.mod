@@ -1,3 +1,3 @@
 module github.com/zxysilent/logs
 
-go 1.15
+go 1.16

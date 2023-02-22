@@ -1,16 +1,21 @@
 package logs
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/zxysilent/logs/internal/buffer"
+	"github.com/zxysilent/logs/internal/encoder"
+)
+
+var (
+	enc = encoder.Encoder{}
 )
 
 // 日志等级
@@ -21,426 +26,328 @@ const (
 	LINFO
 	LWARN
 	LERROR
-	LFATAL
-	maxAge        = 180               // 180 天
-	maxSize       = 1024 * 1024 * 256 // 256 MB
-	bufferSize    = 1024 * 256        // 256 KB
-	digits        = "0123456789"
-	flushInterval = 5 * time.Second
-	logShort      = "[D][I][W][E][F]"
+	LNone
+	maxAge     = 180               // 180 天
+	maxSize    = 1024 * 1024 * 256 // 256 MB
+	bufferSize = 1024 * 256        // 256 KB
+	logShort   = "DBGINFWRNERR"    //TRC DBG INF WRN ERR FTL PNC
 )
 
 // 字符串等级
-func (lv logLevel) Str() string {
-	if lv >= LDEBUG && lv <= LFATAL {
+func (lv logLevel) String() string {
+	if lv >= LDEBUG && lv <= LNone {
 		return logShort[lv*3 : lv*3+3]
 	}
-	return "[N]"
+	return "NIL"
 }
 
-// logger
 type Logger struct {
-	cons     bool          // 标准输出  默认 false
-	callInfo bool          // 是否输出行号和文件名 默认 false
-	maxAge   int           // 最大保留天数
-	maxSize  int64         // 单个日志最大容量 默认 256MB
-	size     int64         // 累计大小 无后缀
-	lpath    string        // 文件目录 完整路径 lpath=lname+lsuffix
-	lname    string        // 文件名
-	lsuffix  string        // 文件后缀名 默认 .log
-	created  string        // 文件创建日期
-	level    logLevel      // 输出的日志等级
-	pool     sync.Pool     // Pool
-	lock     sync.Mutex    // logger🔒
-	writer   *bufio.Writer // 缓存io 缓存到文件
-	file     *os.File      // 日志文件
+	out    io.Writer  // 输出
+	sep    string     // 路径分隔
+	caller bool       // 调用信息
+	level  logLevel   // 日志等级
+	skip   int        //
+	mu     sync.Mutex // logger🔒
 }
 
-// 默认实例
-var fish = NewLogger("logs/app.log")
-
-// NewLogger 实例化logger
-// path 日志完整路径 eg:logs/app.log
-func NewLogger(lpath string) *Logger {
-	fl := new(Logger)
-	fl.lpath = lpath                                 // logs/app.log
-	fl.lsuffix = filepath.Ext(lpath)                 // .log
-	fl.lname = strings.TrimSuffix(lpath, fl.lsuffix) // logs/app
-	if fl.lsuffix == "" {
-		fl.lsuffix = ".log"
+func New(out io.Writer) *Logger {
+	if out == nil {
+		out = io.Discard
 	}
-	os.MkdirAll(filepath.Dir(lpath), 0755)
-	fl.level = LDEBUG
-	fl.maxAge = maxAge
-	fl.maxSize = maxSize
-	fl.pool = sync.Pool{
-		New: func() interface{} {
-			return new(buffer)
-		},
+	n := &Logger{
+		out:    out,
+		caller: false,
+		level:  LINFO,
+		skip:   0,
+		sep:    "/",
 	}
-	go fl.daemon()
-	return fl
+	return n
 }
 
 // 设置实例等级
 func SetLevel(lv logLevel) {
-	fish.SetLevel(lv)
+	log.SetLevel(lv)
 }
 
 // 设置输出等级
 func (fl *Logger) SetLevel(lv logLevel) {
-	if lv < LDEBUG || lv > LFATAL {
+	if lv < LDEBUG || lv > LERROR {
 		panic("非法的日志等级")
 	}
-	fl.lock.Lock()
+	fl.mu.Lock()
 	fl.level = lv
-	fl.lock.Unlock()
+	fl.mu.Unlock()
 }
 
-// 设置最大保存天数
-// 小于0不删除
-func SetMaxAge(ma int) {
-	fish.SetMaxAge(ma)
-}
-
-// 设置最大保存天数
-// 小于0不删除
-func (fl *Logger) SetMaxAge(ma int) {
-	fl.lock.Lock()
-	fl.maxAge = ma
-	fl.lock.Unlock()
-}
-
-// 写入文件
-func Flush() {
-	fish.Flush()
-}
-
-// 写入文件
-func (fl *Logger) Flush() {
-	fl.lock.Lock()
-	fl.flushSync()
-	fl.lock.Unlock()
-}
 func SetCaller(b bool) {
-	fish.SetCaller(b)
+	log.SetCaller(b)
 }
 
 // 设置调用信息
 func (fl *Logger) SetCaller(b bool) {
-	fl.lock.Lock()
-	fl.callInfo = b
-	fl.lock.Unlock()
+	fl.mu.Lock()
+	fl.caller = b
+	fl.mu.Unlock()
 }
 
-// 设置控制台输出
-func SetConsole(b bool) {
-	fish.SetConsole(b)
+func SetSep(sep string) {
+	log.SetSep(sep)
 }
 
-// 设置控制台输出
-func (fl *Logger) SetConsole(b bool) {
-	fl.lock.Lock()
-	fl.cons = b
-	fl.lock.Unlock()
+func (fl *Logger) SetSep(sep string) {
+	fl.mu.Lock()
+	fl.sep = sep
+	fl.mu.Unlock()
+}
+func SetSkip(skip string) {
+	log.SetSkip(skip)
+}
+func (fl *Logger) SetSkip(skip string) {
+	fl.mu.Lock()
+	fl.sep = skip
+	fl.mu.Unlock()
 }
 
-// 生成日志头信息
-func (fl *Logger) header(lv logLevel, depth int) *buffer {
-	now := time.Now()
-	buf := fl.pool.Get().(*buffer)
-	year, month, day := now.Date()
-	hour, minute, second := now.Clock()
-	// format yyyymmdd hh:mm:ss.uuuu [DIWEF] file:line] msg
-	buf.write4(0, year)
-	buf.temp[4] = '/'
-	buf.write2(5, int(month))
-	buf.temp[7] = '/'
-	buf.write2(8, day)
-	buf.temp[10] = ' '
-	buf.write2(11, hour)
-	buf.temp[13] = ':'
-	buf.write2(14, minute)
-	buf.temp[16] = ':'
-	buf.write2(17, second)
-	buf.temp[19] = ' '
-	copy(buf.temp[20:23], lv.Str())
-	buf.temp[23] = ' '
-	buf.Write(buf.temp[:24])
-	// 调用信息
-	if fl.callInfo {
-		_, file, line, ok := runtime.Caller(3 + depth)
+func (l *Logger) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.out.Write(p)
+}
+func (l *Logger) With() *FieldLogger {
+	f := &FieldLogger{}
+	f.logger = l
+	f.attr = buffer.Get()
+	return f
+}
+
+// tracking
+func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
+	f := &FieldLogger{}
+	f.logger = l
+	f.ctx = ctx
+	f.attr = buffer.Get()
+	return f
+}
+
+const trackKey = "x-track-id"
+
+func TrackCtx(ctx context.Context, trackid ...string) context.Context {
+	val := ctx.Value(trackKey)
+	if val == nil {
+		var id = ""
+		if len(trackid) == 0 {
+			id = uuid()
+		} else {
+			id = trackid[0]
+		}
+		ctx = context.WithValue(ctx, trackKey, id)
+	}
+	return ctx
+}
+
+type FieldLogger struct {
+	logger *Logger
+	ctx    context.Context
+	attr   *buffer.Buffer //调用输出后清空
+	buf    *buffer.Buffer //每次输出的时候重置
+}
+
+func header(ctx context.Context, caller bool, skip int, sep string, buf *buffer.Buffer, lv logLevel) {
+	// f.buf.Reset()
+	*buf = enc.PutBeginMarker(*buf)
+	*buf = enc.PutTimeFast(enc.PutKey(*buf, TimeFieldName), time.Now())
+	*buf = enc.PutString(enc.PutKey(*buf, LevelFieldName), lv.String())
+	if ctx != nil {
+		val := ctx.Value(trackKey)
+		if val != nil {
+			if traceId, ok := val.(string); ok {
+				*buf = enc.PutString(enc.PutKey(*buf, TraceFieldName), traceId)
+			}
+		}
+	}
+	if caller {
+		_, file, line, ok := runtime.Caller(skip + 3)
 		if !ok {
 			file = "###"
 			line = 1
 		} else {
-			slash := strings.LastIndex(file, "/")
+			slash := strings.LastIndex(file, sep)
 			if slash >= 0 {
-				file = file[slash+1:]
+				file = file[slash:]
 			}
 		}
-		buf.WriteString(file)
-		buf.temp[0] = ':'
-		n := buf.writeN(1, line)
-		buf.temp[n+1] = ']'
-		buf.temp[n+2] = ' '
-		buf.Write(buf.temp[:n+3])
+		*buf = enc.PutString(enc.PutKey(*buf, CallerFieldName), fmt.Sprintf("%s:%d", file, line))
 	}
-	return buf
 }
-
-// 换行输出
-func (fl *Logger) println(lv logLevel, args ...interface{}) {
+func (fl *Logger) print(lv logLevel, args ...interface{}) {
 	if lv < fl.level {
 		return
 	}
-	buf := fl.header(lv, 0)
-	fmt.Fprintln(buf, args...)
-	fl.Write(buf.Bytes())
-	buf.Reset()
-	fl.pool.Put(buf)
+	buf := buffer.Get()
+	header(nil, fl.caller, fl.skip, fl.sep, buf, lv)
+	if len(args) >= 1 {
+		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), fmt.Sprint(args...))
+	}
+	*buf = enc.PutEndMarker(*buf)
+	*buf = enc.PutLineBreak(*buf)
+	fl.Write(*buf)
+	buffer.Put(buf)
 }
-
-// 格式输出
 func (fl *Logger) printf(lv logLevel, format string, args ...interface{}) {
 	if lv < fl.level {
 		return
 	}
-	buf := fl.header(lv, 0)
-	fmt.Fprintf(buf, format, args...)
-	if buf.Bytes()[buf.Len()-1] != '\n' {
-		buf.WriteByte('\n')
+	buf := buffer.Get()
+	header(nil, fl.caller, fl.skip, fl.sep, buf, lv)
+	if len(args) >= 1 {
+		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), fmt.Sprintf(format, args...))
+	} else {
+		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), format)
 	}
-	fl.Write(buf.Bytes())
-	buf.Reset()
-	fl.pool.Put(buf)
+	*buf = enc.PutEndMarker(*buf)
+	*buf = enc.PutLineBreak(*buf)
+	fl.Write(*buf)
+	buffer.Put(buf)
 }
 
-// 写入数据
-func (fl *Logger) Write(buf []byte) (n int, err error) {
-	fl.lock.Lock()
-	defer fl.lock.Unlock()
-	if fl.cons {
-		os.Stderr.Write(buf)
-	}
-	if fl.file == nil {
-		if err := fl.rotate(); err != nil {
-			os.Stderr.Write(buf)
-			fl.exit(err)
-		}
-	}
-	// 按天切割
-	if fl.created != string(buf[0:10]) {
-		go fl.delete() // 每天检测一次旧文件
-		if err := fl.rotate(); err != nil {
-			fl.exit(err)
-		}
-	}
-	// 按大小切割
-	if fl.size+int64(len(buf)) >= fl.maxSize {
-		if err := fl.rotate(); err != nil {
-			fl.exit(err)
-		}
-	}
-	n, err = fl.writer.Write(buf)
-	fl.size += int64(n)
-	if err != nil {
-		fl.exit(err)
-	}
-	return
-}
-
-// 删除旧日志
-func (fl *Logger) delete() {
-	if fl.maxAge < 0 {
+func (fl *FieldLogger) print(lv logLevel, args ...interface{}) {
+	if lv < fl.logger.level {
 		return
 	}
-	dir := filepath.Dir(fl.lpath)
-	fakeNow := time.Now().AddDate(0, 0, -fl.maxAge)
-	filepath.Walk(dir, func(fpath string, info os.FileInfo, err error) error {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "logs: unable to delete old file '%s', error: %v\n", fpath, r)
-			}
-		}()
-		if info == nil {
-			return nil
+	fl.buf = buffer.Get()
+	header(fl.ctx, fl.logger.caller, fl.logger.skip, fl.logger.sep, fl.buf, lv)
+	if fl.attr != nil && len(*fl.attr) >= 1 {
+		*fl.buf = append(*fl.buf, ',')
+		*fl.buf = append(*fl.buf, *fl.attr...)
+	}
+	if len(args) >= 1 {
+		*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), fmt.Sprint(args...))
+	}
+	*fl.buf = enc.PutEndMarker(*fl.buf)
+	*fl.buf = enc.PutLineBreak(*fl.buf)
+	fl.logger.Write(*fl.buf)
+	buffer.Put(fl.buf)
+	buffer.Put(fl.attr)
+	fl.attr = nil
+}
+func (fl *FieldLogger) printf(lv logLevel, format string, args ...interface{}) {
+	if lv < fl.logger.level {
+		return
+	}
+	fl.buf = buffer.Get()
+	header(fl.ctx, fl.logger.caller, fl.logger.skip, fl.logger.sep, fl.buf, lv)
+	if fl.attr != nil && len(*fl.attr) >= 1 {
+		*fl.buf = append(*fl.buf, ',')
+		*fl.buf = append(*fl.buf, *fl.attr...)
+	}
+	if format != "" {
+		if len(args) >= 1 {
+			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), fmt.Sprintf(format, args...))
+		} else {
+			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), format)
 		}
-		// 防止误删
-		if !info.IsDir() && info.ModTime().Before(fakeNow) && strings.HasSuffix(info.Name(), fl.lsuffix) {
-			os.Remove(fpath)
-		}
-		return nil
-	})
-}
-
-// 定时写入文件
-func (fl *Logger) daemon() {
-	for range time.NewTicker(flushInterval).C {
-		fl.Flush()
 	}
+
+	*fl.buf = enc.PutEndMarker(*fl.buf)
+	*fl.buf = enc.PutLineBreak(*fl.buf)
+	fl.logger.Write(*fl.buf)
+	buffer.Put(fl.buf)
+	buffer.Put(fl.attr)
+	fl.attr = nil
 }
 
-// 不能锁
-func (fl *Logger) flushSync() {
-	if fl.file != nil {
-		fl.writer.Flush() // 写入底层数据
-		fl.file.Sync()    // 同步到磁盘
-	}
+func (fl *FieldLogger) Debug(args ...interface{}) {
+	fl.print(LDEBUG, args...)
 }
 
-func (fl *Logger) exit(err error) {
-	fmt.Fprintf(os.Stderr, "logs: exiting because of error: %s\n", err)
-	fl.flushSync()
-	os.Exit(0)
+func (fl *FieldLogger) Debugf(foramt string, args ...interface{}) {
+	fl.printf(LDEBUG, foramt, args...)
 }
 
-// rotate 切割文件
-func (fl *Logger) rotate() error {
-	now := time.Now()
-	if fl.file != nil {
-		fl.writer.Flush()
-		fl.file.Sync()
-		fl.file.Close()
-		// 保存
-		fbak := filepath.Join(fl.lname + now.Format(".2006-01-02_150405") + fl.lsuffix)
-		os.Rename(fl.lpath, fbak)
-		fl.size = 0
-	}
-	finfo, err := os.Stat(fl.lpath)
-	fl.created = now.Format("2006/01/02")
-	if err == nil {
-		fl.size = finfo.Size()
-		fl.created = finfo.ModTime().Format("2006/01/02")
-	}
-	fout, err := os.OpenFile(fl.lpath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		return err
-	}
-	fl.file = fout
-	fl.writer = bufio.NewWriterSize(fl.file, bufferSize)
-	return nil
+func (fl *FieldLogger) Info(args ...interface{}) {
+	fl.print(LINFO, args...)
 }
 
-type buffer struct {
-	temp [64]byte
-	bytes.Buffer
+func (fl *FieldLogger) Infof(foramt string, args ...interface{}) {
+	fl.printf(LINFO, foramt, args...)
 }
 
-func (buf *buffer) write2(i, d int) {
-	buf.temp[i+1] = digits[d%10]
-	d /= 10
-	buf.temp[i] = digits[d%10]
+func (fl *FieldLogger) Wran(args ...interface{}) {
+	fl.print(LWARN, args...)
 }
 
-func (buf *buffer) write4(i, d int) {
-	buf.temp[i+3] = digits[d%10]
-	d /= 10
-	buf.temp[i+2] = digits[d%10]
-	d /= 10
-	buf.temp[i+1] = digits[d%10]
-	d /= 10
-	buf.temp[i] = digits[d%10]
+func (fl *FieldLogger) Wranf(foramt string, args ...interface{}) {
+	fl.printf(LWARN, foramt, args...)
+}
+func (fl *FieldLogger) Error(args ...interface{}) {
+	fl.print(LERROR, args...)
 }
 
-func (buf *buffer) writeN(i, d int) int {
-	j := len(buf.temp)
-	for d > 0 {
-		j--
-		buf.temp[j] = digits[d%10]
-		d /= 10
-	}
-	return copy(buf.temp[i:], buf.temp[j:])
+func (fl *FieldLogger) Errorf(foramt string, args ...interface{}) {
+	fl.printf(LERROR, foramt, args...)
 }
-
-// -------- 实例 fish
-
-func Debug(args ...interface{}) {
-	fish.println(LDEBUG, args...)
-}
-
-func Debugf(format string, args ...interface{}) {
-	fish.printf(LDEBUG, format, args...)
-}
-func Info(args ...interface{}) {
-	fish.println(LINFO, args...)
-}
-
-func Infof(format string, args ...interface{}) {
-	fish.printf(LINFO, format, args...)
-}
-
-func Warn(args ...interface{}) {
-	fish.println(LWARN, args...)
-}
-
-func Warnf(format string, args ...interface{}) {
-	fish.printf(LWARN, format, args...)
-}
-
-func Error(args ...interface{}) {
-	fish.println(LERROR, args...)
-}
-
-func Errorf(format string, args ...interface{}) {
-	fish.printf(LERROR, format, args...)
-}
-
-func Fatal(args ...interface{}) {
-	fish.println(LFATAL, args...)
-	os.Exit(0)
-}
-func Fatalf(format string, args ...interface{}) {
-	fish.printf(LFATAL, format, args...)
-	os.Exit(0)
-}
-func Writer() io.Writer {
-	return fish
-}
-
-// -------- 实例 自定义
-
 func (fl *Logger) Debug(args ...interface{}) {
-	fl.println(LDEBUG, args...)
+	fl.print(LDEBUG, args...)
 }
 
-func (fl *Logger) Debugf(format string, args ...interface{}) {
-	fl.printf(LDEBUG, format, args...)
+//----------------------------------------------------------------
+
+func (fl *Logger) Debugf(foramt string, args ...interface{}) {
+	fl.printf(LDEBUG, foramt, args...)
 }
+
 func (fl *Logger) Info(args ...interface{}) {
-	fl.println(LINFO, args...)
+	fl.print(LINFO, args...)
 }
 
-func (fl *Logger) Infof(format string, args ...interface{}) {
-	fl.printf(LINFO, format, args...)
+func (fl *Logger) Infof(foramt string, args ...interface{}) {
+	fl.printf(LINFO, foramt, args...)
 }
 
-func (fl *Logger) Warn(args ...interface{}) {
-	fl.println(LWARN, args...)
+func (fl *Logger) Wran(args ...interface{}) {
+	fl.print(LWARN, args...)
 }
 
-func (fl *Logger) Warnf(format string, args ...interface{}) {
-	fl.printf(LWARN, format, args...)
+func (fl *Logger) Wranf(foramt string, args ...interface{}) {
+	fl.printf(LWARN, foramt, args...)
 }
-
 func (fl *Logger) Error(args ...interface{}) {
-	fl.println(LERROR, args...)
+	fl.print(LERROR, args...)
 }
 
-func (fl *Logger) Errorf(format string, args ...interface{}) {
-	fl.printf(LERROR, format, args...)
-}
-
-func (fl *Logger) Fatal(args ...interface{}) {
-	fl.println(LFATAL, args...)
-	os.Exit(0)
-}
-
-func (fl *Logger) Fatalf(format string, args ...interface{}) {
-	fl.printf(LFATAL, format, args...)
-	os.Exit(0)
+func (fl *Logger) Errorf(foramt string, args ...interface{}) {
+	fl.printf(LERROR, foramt, args...)
 }
 
 func (fl *Logger) Writer() io.Writer {
 	return fl
+}
+
+var log = New(os.Stdout)
+
+func Debugf(foramt string, args ...interface{}) {
+	log.printf(LDEBUG, foramt, args...)
+}
+
+func Info(args ...interface{}) {
+	log.print(LINFO, args...)
+}
+
+func Infof(foramt string, args ...interface{}) {
+	log.printf(LINFO, foramt, args...)
+}
+
+func Wran(args ...interface{}) {
+	log.print(LWARN, args...)
+}
+
+func Wranf(foramt string, args ...interface{}) {
+	log.printf(LWARN, foramt, args...)
+}
+func Error(args ...interface{}) {
+	log.print(LERROR, args...)
+}
+
+func Errorf(foramt string, args ...interface{}) {
+	log.printf(LERROR, foramt, args...)
 }
