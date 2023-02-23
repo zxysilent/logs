@@ -27,10 +27,7 @@ const (
 	LWARN
 	LERROR
 	LNone
-	maxAge     = 180               // 180 天
-	maxSize    = 1024 * 1024 * 256 // 256 MB
-	bufferSize = 1024 * 256        // 256 KB
-	logShort   = "DBGINFWRNERR"    //TRC DBG INF WRN ERR FTL PNC
+	logShort = "DBGINFWRNERR" //TRC DBG INF WRN ERR FTL PNC
 )
 
 // 字符串等级
@@ -325,6 +322,9 @@ func (fl *Logger) Writer() io.Writer {
 
 var log = New(os.Stdout)
 
+func Debug(args ...interface{}) {
+	log.print(LDEBUG, args...)
+}
 func Debugf(foramt string, args ...interface{}) {
 	log.printf(LDEBUG, foramt, args...)
 }
@@ -344,10 +344,17 @@ func Warn(args ...interface{}) {
 func Warnf(foramt string, args ...interface{}) {
 	log.printf(LWARN, foramt, args...)
 }
+
 func Error(args ...interface{}) {
 	log.print(LERROR, args...)
 }
 
 func Errorf(foramt string, args ...interface{}) {
 	log.printf(LERROR, foramt, args...)
+}
+func With() *FieldLogger {
+	return log.With()
+}
+func Ctx(ctx context.Context) *FieldLogger {
+	return log.Ctx(ctx)
 }
