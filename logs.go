@@ -116,10 +116,18 @@ func (fl *Logger) SetSkip(skip string) {
 	fl.sep = skip
 	fl.mu.Unlock()
 }
+func SetOutput(out io.Writer) {
+	log.SetOutput(out)
+}
 
+func (fl *Logger) SetOutput(out io.Writer) {
+	fl.mu.Lock()
+	fl.out = out
+	fl.mu.Unlock()
+}
 func (l *Logger) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	// l.mu.Lock()
+	// defer l.mu.Unlock()
 	return l.out.Write(p)
 }
 
