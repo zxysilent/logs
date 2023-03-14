@@ -64,10 +64,10 @@ func (s *FieldLogger) Err(err error) *FieldLogger {
 		return s
 	}
 	if err == nil {
-		*s.attr = enc.PutNil(enc.PutKey(*s.attr, ErrorFieldName))
+		*s.attr = enc.PutNil(enc.PutKey(*s.attr, errorFieldName))
 
 	} else {
-		*s.attr = enc.PutString(enc.PutKey(*s.attr, ErrorFieldName), err.Error())
+		*s.attr = enc.PutString(enc.PutKey(*s.attr, errorFieldName), err.Error())
 	}
 	return s
 }
@@ -281,7 +281,7 @@ func (s *FieldLogger) Time(key string, t time.Time) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = enc.PutTime(enc.PutKey(*s.attr, key), t, TimeFieldFormat)
+	*s.attr = enc.PutTime(enc.PutKey(*s.attr, key), t, timeFieldFormat)
 	return s
 }
 
@@ -289,7 +289,7 @@ func (s *FieldLogger) Times(key string, t []time.Time) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = enc.PutTimes(enc.PutKey(*s.attr, key), t, TimeFieldFormat)
+	*s.attr = enc.PutTimes(enc.PutKey(*s.attr, key), t, timeFieldFormat)
 	return s
 }
 
@@ -297,7 +297,7 @@ func (s *FieldLogger) Dur(key string, d time.Duration) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = enc.PutDuration(enc.PutKey(*s.attr, key), d, DurationFieldUnit, DurationFieldInteger)
+	*s.attr = enc.PutDuration(enc.PutKey(*s.attr, key), d, durationFieldUnit)
 	return s
 }
 
@@ -308,7 +308,7 @@ func (s *FieldLogger) Durs(key string, d []time.Duration) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = enc.PutDurations(enc.PutKey(*s.attr, key), d, DurationFieldUnit, DurationFieldInteger)
+	*s.attr = enc.PutDurations(enc.PutKey(*s.attr, key), d, durationFieldUnit)
 	return s
 }
 
@@ -385,9 +385,9 @@ func (s *FieldLogger) Auto(key string, val interface{}) *FieldLogger {
 	case float64:
 		*s.attr = enc.PutFloat64(*s.attr, val)
 	case time.Time:
-		*s.attr = enc.PutTime(*s.attr, val, TimeFieldFormat)
+		*s.attr = enc.PutTime(*s.attr, val, timeFieldFormat)
 	case time.Duration:
-		*s.attr = enc.PutDuration(*s.attr, val, DurationFieldUnit, DurationFieldInteger)
+		*s.attr = enc.PutDuration(*s.attr, val, durationFieldUnit)
 	case *string:
 		if val != nil {
 			*s.attr = enc.PutString(*s.attr, *val)
@@ -474,13 +474,13 @@ func (s *FieldLogger) Auto(key string, val interface{}) *FieldLogger {
 		}
 	case *time.Time:
 		if val != nil {
-			*s.attr = enc.PutTime(*s.attr, *val, TimeFieldFormat)
+			*s.attr = enc.PutTime(*s.attr, *val, timeFieldFormat)
 		} else {
 			*s.attr = enc.PutNil(*s.attr)
 		}
 	case *time.Duration:
 		if val != nil {
-			*s.attr = enc.PutDuration(*s.attr, *val, DurationFieldUnit, DurationFieldInteger)
+			*s.attr = enc.PutDuration(*s.attr, *val, durationFieldUnit)
 		} else {
 			*s.attr = enc.PutNil(*s.attr)
 		}
@@ -513,9 +513,9 @@ func (s *FieldLogger) Auto(key string, val interface{}) *FieldLogger {
 	case []float64:
 		*s.attr = enc.PutFloats64(*s.attr, val)
 	case []time.Time:
-		*s.attr = enc.PutTimes(*s.attr, val, TimeFieldFormat)
+		*s.attr = enc.PutTimes(*s.attr, val, timeFieldFormat)
 	case []time.Duration:
-		*s.attr = enc.PutDurations(*s.attr, val, DurationFieldUnit, DurationFieldInteger)
+		*s.attr = enc.PutDurations(*s.attr, val, durationFieldUnit)
 	case nil:
 		*s.attr = enc.PutNil(*s.attr)
 	case json.RawMessage:

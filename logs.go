@@ -29,6 +29,16 @@ const (
 	LNone
 	logShort = "DBGINFWRNERR" //TRC DBG INF WRN ERR FTL PNC
 )
+const (
+	timeFieldName     = "time"
+	traceFieldName    = "trace"
+	levelFieldName    = "level"
+	msgFieldName      = "msg"
+	errorFieldName    = "error"
+	callerFieldName   = "caller"
+	timeFieldFormat   = "2006/01/02 15:04:05.000"
+	durationFieldUnit = time.Millisecond
+)
 
 // 字符串等级
 func (lv logLevel) String() string {
@@ -96,9 +106,11 @@ func (fl *Logger) SetSep(sep string) {
 	fl.sep = sep
 	fl.mu.Unlock()
 }
+
 func SetSkip(skip string) {
 	log.SetSkip(skip)
 }
+
 func (fl *Logger) SetSkip(skip string) {
 	fl.mu.Lock()
 	fl.sep = skip
@@ -110,6 +122,7 @@ func (l *Logger) Write(p []byte) (int, error) {
 	defer l.mu.Unlock()
 	return l.out.Write(p)
 }
+
 func (l *Logger) With() *FieldLogger {
 	f := &FieldLogger{}
 	f.logger = l
@@ -152,13 +165,13 @@ type FieldLogger struct {
 func header(ctx context.Context, caller bool, skip int, sep string, buf *buffer.Buffer, lv logLevel) {
 	// f.buf.Reset()
 	*buf = enc.PutBeginMarker(*buf)
-	*buf = enc.PutTimeFast(enc.PutKey(*buf, TimeFieldName), time.Now())
-	*buf = enc.PutString(enc.PutKey(*buf, LevelFieldName), lv.String())
+	*buf = enc.PutTimeFast(enc.PutKey(*buf, timeFieldName), time.Now())
+	*buf = enc.PutString(enc.PutKey(*buf, levelFieldName), lv.String())
 	if ctx != nil {
 		val := ctx.Value(trackKey)
 		if val != nil {
 			if traceId, ok := val.(string); ok {
-				*buf = enc.PutString(enc.PutKey(*buf, TraceFieldName), traceId)
+				*buf = enc.PutString(enc.PutKey(*buf, traceFieldName), traceId)
 			}
 		}
 	}
@@ -173,9 +186,10 @@ func header(ctx context.Context, caller bool, skip int, sep string, buf *buffer.
 				file = file[slash:]
 			}
 		}
-		*buf = enc.PutString(enc.PutKey(*buf, CallerFieldName), fmt.Sprintf("%s:%d", file, line))
+		*buf = enc.PutString(enc.PutKey(*buf, callerFieldName), fmt.Sprintf("%s:%d", file, line))
 	}
 }
+
 func (fl *Logger) print(lv logLevel, args ...interface{}) {
 	if lv < fl.level {
 		return
@@ -183,13 +197,14 @@ func (fl *Logger) print(lv logLevel, args ...interface{}) {
 	buf := buffer.Get()
 	header(nil, fl.caller, fl.skip, fl.sep, buf, lv)
 	if len(args) >= 1 {
-		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), fmt.Sprint(args...))
+		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), fmt.Sprint(args...))
 	}
 	*buf = enc.PutEndMarker(*buf)
 	*buf = enc.PutLineBreak(*buf)
 	fl.Write(*buf)
 	buffer.Put(buf)
 }
+
 func (fl *Logger) printf(lv logLevel, format string, args ...interface{}) {
 	if lv < fl.level {
 		return
@@ -197,9 +212,9 @@ func (fl *Logger) printf(lv logLevel, format string, args ...interface{}) {
 	buf := buffer.Get()
 	header(nil, fl.caller, fl.skip, fl.sep, buf, lv)
 	if len(args) >= 1 {
-		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), fmt.Sprintf(format, args...))
+		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), fmt.Sprintf(format, args...))
 	} else {
-		*buf = enc.PutString(enc.PutKey(*buf, MsgFieldName), format)
+		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), format)
 	}
 	*buf = enc.PutEndMarker(*buf)
 	*buf = enc.PutLineBreak(*buf)
@@ -218,7 +233,7 @@ func (fl *FieldLogger) print(lv logLevel, args ...interface{}) {
 		*fl.buf = append(*fl.buf, *fl.attr...)
 	}
 	if len(args) >= 1 {
-		*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), fmt.Sprint(args...))
+		*fl.buf = enc.PutString(enc.PutKey(*fl.buf, msgFieldName), fmt.Sprint(args...))
 	}
 	*fl.buf = enc.PutEndMarker(*fl.buf)
 	*fl.buf = enc.PutLineBreak(*fl.buf)
@@ -227,6 +242,7 @@ func (fl *FieldLogger) print(lv logLevel, args ...interface{}) {
 	buffer.Put(fl.attr)
 	fl.attr = nil
 }
+
 func (fl *FieldLogger) printf(lv logLevel, format string, args ...interface{}) {
 	if lv < fl.logger.level {
 		return
@@ -239,9 +255,9 @@ func (fl *FieldLogger) printf(lv logLevel, format string, args ...interface{}) {
 	}
 	if format != "" {
 		if len(args) >= 1 {
-			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), fmt.Sprintf(format, args...))
+			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, msgFieldName), fmt.Sprintf(format, args...))
 		} else {
-			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, MsgFieldName), format)
+			*fl.buf = enc.PutString(enc.PutKey(*fl.buf, msgFieldName), format)
 		}
 	}
 
@@ -289,35 +305,35 @@ func (fl *Logger) Debug(args ...interface{}) {
 
 //----------------------------------------------------------------
 
-func (fl *Logger) Debugf(foramt string, args ...interface{}) {
-	fl.printf(LDEBUG, foramt, args...)
+func (l *Logger) Debugf(foramt string, args ...interface{}) {
+	l.printf(LDEBUG, foramt, args...)
 }
 
-func (fl *Logger) Info(args ...interface{}) {
-	fl.print(LINFO, args...)
+func (l *Logger) Info(args ...interface{}) {
+	l.print(LINFO, args...)
 }
 
-func (fl *Logger) Infof(foramt string, args ...interface{}) {
-	fl.printf(LINFO, foramt, args...)
+func (l *Logger) Infof(foramt string, args ...interface{}) {
+	l.printf(LINFO, foramt, args...)
 }
 
 func (fl *Logger) Warn(args ...interface{}) {
 	fl.print(LWARN, args...)
 }
 
-func (fl *Logger) Warnf(foramt string, args ...interface{}) {
-	fl.printf(LWARN, foramt, args...)
+func (l *Logger) Warnf(foramt string, args ...interface{}) {
+	l.printf(LWARN, foramt, args...)
 }
-func (fl *Logger) Error(args ...interface{}) {
-	fl.print(LERROR, args...)
-}
-
-func (fl *Logger) Errorf(foramt string, args ...interface{}) {
-	fl.printf(LERROR, foramt, args...)
+func (l *Logger) Error(args ...interface{}) {
+	l.print(LERROR, args...)
 }
 
-func (fl *Logger) Writer() io.Writer {
-	return fl
+func (l *Logger) Errorf(foramt string, args ...interface{}) {
+	l.printf(LERROR, foramt, args...)
+}
+
+func (l *Logger) Writer() io.Writer {
+	return l
 }
 
 var log = New(os.Stdout)
@@ -352,9 +368,11 @@ func Error(args ...interface{}) {
 func Errorf(foramt string, args ...interface{}) {
 	log.printf(LERROR, foramt, args...)
 }
+
 func With() *FieldLogger {
 	return log.With()
 }
+
 func Ctx(ctx context.Context) *FieldLogger {
 	return log.Ctx(ctx)
 }

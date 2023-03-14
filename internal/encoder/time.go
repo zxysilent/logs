@@ -10,6 +10,7 @@ const (
 	timeFormatUnixMs    = "UNIXMS"
 	timeFormatUnixMicro = "UNIXMICRO"
 	timeFormatUnixNano  = "UNIXNANO"
+	timeFieldFormat     = "2006/01/02 15:04:05.000"
 )
 
 // PutTime formats the input time with the given format
@@ -24,6 +25,8 @@ func (e Encoder) PutTime(dst []byte, t time.Time, format string) []byte {
 		return e.PutInt64(dst, t.UnixNano()/1000)
 	case timeFormatUnixNano:
 		return e.PutInt64(dst, t.UnixNano())
+	case timeFieldFormat:
+		return e.PutTimeFast(dst, t)
 	}
 	return append(t.AppendFormat(append(dst, '"'), format), '"')
 }
@@ -171,24 +174,21 @@ func appendFormatFast(b []byte, t time.Time) []byte {
 
 // PutDuration formats the input duration with the given unit & format
 // and appends the encoded string to the input byte slice.
-func (e Encoder) PutDuration(dst []byte, d time.Duration, unit time.Duration, useInt bool) []byte {
-	if useInt {
-		return strconv.AppendInt(dst, int64(d/unit), 10)
-	}
+func (e Encoder) PutDuration(dst []byte, d time.Duration, unit time.Duration) []byte {
 	return e.PutFloat64(dst, float64(d)/float64(unit))
 }
 
 // PutDurations formats the input durations with the given unit & format
 // and appends the encoded string list to the input byte slice.
-func (e Encoder) PutDurations(dst []byte, vals []time.Duration, unit time.Duration, useInt bool) []byte {
+func (e Encoder) PutDurations(dst []byte, vals []time.Duration, unit time.Duration) []byte {
 	if len(vals) == 0 {
 		return append(dst, '[', ']')
 	}
 	dst = append(dst, '[')
-	dst = e.PutDuration(dst, vals[0], unit, useInt)
+	dst = e.PutDuration(dst, vals[0], unit)
 	if len(vals) > 1 {
 		for _, d := range vals[1:] {
-			dst = e.PutDuration(append(dst, ','), d, unit, useInt)
+			dst = e.PutDuration(append(dst, ','), d, unit)
 		}
 	}
 	dst = append(dst, ']')
