@@ -131,6 +131,7 @@ func (l *Logger) Write(p []byte) (int, error) {
 func (l *Logger) With() *FieldLogger {
 	f := &FieldLogger{}
 	f.logger = l
+	f.caller = l.caller
 	f.attr = buffer.Get()
 	return f
 }
@@ -138,8 +139,9 @@ func (l *Logger) With() *FieldLogger {
 // tracking
 func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
 	f := &FieldLogger{}
-	f.logger = l
 	f.ctx = ctx
+	f.logger = l
+	f.caller = l.caller
 	f.attr = buffer.Get()
 	return f
 }
@@ -235,7 +237,7 @@ func printf(ctx context.Context, lv logLevel, caller bool, log *Logger, attr *bu
 }
 func (fl *FieldLogger) Debug(args ...interface{}) {
 	if LDEBUG >= fl.logger.level {
-		print(fl.ctx, LDEBUG, fl.logger.caller, fl.logger, fl.attr, args...)
+		print(fl.ctx, LDEBUG, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -243,7 +245,7 @@ func (fl *FieldLogger) Debug(args ...interface{}) {
 
 func (fl *FieldLogger) Debugf(foramt string, args ...interface{}) {
 	if LDEBUG >= fl.logger.level {
-		printf(fl.ctx, LDEBUG, fl.logger.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.ctx, LDEBUG, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -251,7 +253,7 @@ func (fl *FieldLogger) Debugf(foramt string, args ...interface{}) {
 
 func (fl *FieldLogger) Info(args ...interface{}) {
 	if LINFO >= fl.logger.level {
-		print(fl.ctx, LINFO, fl.logger.caller, fl.logger, fl.attr, args...)
+		print(fl.ctx, LINFO, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -259,7 +261,7 @@ func (fl *FieldLogger) Info(args ...interface{}) {
 
 func (fl *FieldLogger) Infof(foramt string, args ...interface{}) {
 	if LINFO >= fl.logger.level {
-		printf(fl.ctx, LINFO, fl.logger.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.ctx, LINFO, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -267,7 +269,7 @@ func (fl *FieldLogger) Infof(foramt string, args ...interface{}) {
 
 func (fl *FieldLogger) Warn(args ...interface{}) {
 	if LWARN >= fl.logger.level {
-		print(fl.ctx, LWARN, fl.logger.caller, fl.logger, fl.attr, args...)
+		print(fl.ctx, LWARN, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -275,14 +277,14 @@ func (fl *FieldLogger) Warn(args ...interface{}) {
 
 func (fl *FieldLogger) Warnf(foramt string, args ...interface{}) {
 	if LWARN >= fl.logger.level {
-		printf(fl.ctx, LWARN, fl.logger.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.ctx, LWARN, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
 }
 func (fl *FieldLogger) Error(args ...interface{}) {
 	if LERROR >= fl.logger.level {
-		print(fl.ctx, LERROR, fl.logger.caller, fl.logger, fl.attr, args...)
+		print(fl.ctx, LERROR, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
@@ -290,7 +292,7 @@ func (fl *FieldLogger) Error(args ...interface{}) {
 
 func (fl *FieldLogger) Errorf(foramt string, args ...interface{}) {
 	if LERROR >= fl.logger.level {
-		printf(fl.ctx, LERROR, fl.logger.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.ctx, LERROR, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
 		buffer.Put(fl.attr)
 		fl.attr = nil
 	}
