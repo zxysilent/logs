@@ -27,7 +27,6 @@ const (
 	LINFO
 	LWARN
 	LERROR
-	LNone
 	logShort = "DBGINFWRNERRFTL" //DBG INF WRN ERR
 )
 const (
@@ -43,10 +42,7 @@ const (
 
 // 字符串等级
 func (lv logLevel) String() string {
-	if lv >= LDEBUG && lv <= LNone {
-		return logShort[lv*3 : lv*3+3]
-	}
-	return "NIL"
+	return logShort[lv*3 : lv*3+3]
 }
 
 type Logger struct {
@@ -79,7 +75,7 @@ func SetLevel(lv logLevel) {
 
 // 设置输出等级
 func (fl *Logger) SetLevel(lv logLevel) {
-	if lv >= LDEBUG || lv > LERROR {
+	if lv < LDEBUG || lv > LERROR {
 		panic("非法的日志等级")
 	}
 	fl.mu.Lock()
