@@ -16,56 +16,56 @@ var _ xlog.Logger = &XLogger{}
 // Error implement ILogger
 func (s *XLogger) Error(v ...interface{}) {
 	if s.level <= xlog.LOG_ERR {
-		s.loger.Error(v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Error(v...)
 	}
 }
 
 // Errorf implement ILogger
 func (s *XLogger) Errorf(format string, v ...interface{}) {
 	if s.level <= xlog.LOG_ERR {
-		s.loger.Errorf(format, v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Errorf(format, v...)
 	}
 }
 
 // Debug implement ILogger
 func (s *XLogger) Debug(v ...interface{}) {
 	if s.level <= xlog.LOG_DEBUG {
-		s.loger.Debug(v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Debug(v...)
 	}
 }
 
 // Debugf implement ILogger
 func (s *XLogger) Debugf(format string, v ...interface{}) {
 	if s.level <= xlog.LOG_DEBUG {
-		s.loger.Debugf(format, v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Debugf(format, v...)
 	}
 }
 
 // Info implement ILogger
 func (s *XLogger) Info(v ...interface{}) {
 	if s.level <= xlog.LOG_INFO {
-		s.loger.Info(v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Info(v...)
 	}
 }
 
 // Infof implement ILogger
 func (s *XLogger) Infof(format string, v ...interface{}) {
 	if s.level <= xlog.LOG_INFO {
-		s.loger.Infof(format, v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Infof(format, v...)
 	}
 }
 
 // Warn implement ILogger
 func (s *XLogger) Warn(v ...interface{}) {
 	if s.level <= xlog.LOG_WARNING {
-		s.loger.Warn(v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Warn(v...)
 	}
 }
 
 // Warnf implement ILogger
 func (s *XLogger) Warnf(format string, v ...interface{}) {
 	if s.level <= xlog.LOG_WARNING {
-		s.loger.Warnf(format, v...)
+		s.loger.With().Caller(false).Str("log", "xorm").Warnf(format, v...)
 	}
 }
 

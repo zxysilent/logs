@@ -24,6 +24,7 @@ func (s *blackholeStream) Write(p []byte) (int, error) {
 func BenchmarkParallel(b *testing.B) {
 	stream := &blackholeStream{}
 	logger := New(stream)
+	// logger.SetCaller(true)
 	// logger.caller = true
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -38,8 +39,7 @@ func BenchmarkParallel(b *testing.B) {
 				Int64("key5", 5).
 				Uint("key", 6).
 				Uint8("key", 7).
-				Float32("high", 123.2).
-				Info()
+				Float32("high", 123.2).Info()
 		}
 	})
 
@@ -49,11 +49,11 @@ func BenchmarkParallel(b *testing.B) {
 }
 func BenchmarkUUID(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		uuid()
+		trace()
 	}
 }
 func TestUUID(t *testing.T) {
-	t.Log(uuid())
+	t.Log(trace())
 }
 func TestLogger(t *testing.T) {
 	log.SetCaller(true)
@@ -94,6 +94,13 @@ func TestField(t *testing.T) {
 	f.Info()
 }
 
+const lines = `
+line1
+line2
+	tab
+space	
+`
+
 func TestLog(t *testing.T) {
 	l := New(os.Stdout)
 	l.With().
@@ -119,15 +126,18 @@ func TestLog(t *testing.T) {
 		Dur("key", 0).Any("key-any", runtime.BlockProfileRecord{}).Info("xx")
 }
 func TestLog1(t *testing.T) {
+	SetCaller(true)
 	l := New(os.Stdout)
+	l.SetCaller(true)
 	l.With().Info()
 	Info("")
-	Infof("")
+	Errorf("")
+	l.With().RawJSON("x", []byte(lines)).Info()
 }
 func TestLog2(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetCaller(true)
-	ctx := TrackCtx(context.Background(), "1111")
+	ctx := TrackCtx(context.Background(), trace())
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Str("t", "xx").Str("tx", "tt").Info()
