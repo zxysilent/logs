@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// ---------------------------------------------------------------------------------------------------Parallel
 type blackholeStream struct {
 	writeCount uint64
 }
@@ -30,16 +31,16 @@ func BenchmarkParallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			logger.With().
-				Str("rate", "15").
-				Int("low", 16).
-				Bool("key", true).
-				Int8("key2", 2).
-				Int16("key3", 3).
-				Int32("key4", 4).
-				Int64("key5", 5).
-				Uint("key", 6).
-				Uint8("key", 7).
-				Float32("high", 123.2).Info()
+				Str("str", "str").
+				Int("int", 1025).
+				Bool("bool", true).
+				Int8("int8", 8).
+				Int16("int16", 16).
+				Int32("int32", 32).
+				Int64("int64", 64).
+				Uint("uint", 6).
+				Uint8("uin8", 8).
+				Float32("float32", 3.14).Info()
 		}
 	})
 
@@ -47,26 +48,21 @@ func BenchmarkParallel(b *testing.B) {
 		b.Fatalf("Log write count")
 	}
 }
-func BenchmarkUUID(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		trace()
-	}
-}
-func TestUUID(t *testing.T) {
-	t.Log(trace())
-}
+
 func TestLogger(t *testing.T) {
 	log.SetCaller(true)
-	Info("")
+	Debug()
+	Debug("debug")
+	Debugf("debugf")
 	Info()
-}
-func BenchmarkLogger(b *testing.B) {
-	n := New(nil)
-	f := n.With()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		f.Info("info info info info")
-	}
+	Info("info")
+	Infof("infof")
+	Warn()
+	Warn("warn")
+	Warnf("warnf")
+	Error()
+	Error("erro")
+	Errorf("errorf")
 }
 
 func TestField(t *testing.T) {
@@ -94,47 +90,7 @@ func TestField(t *testing.T) {
 	f.Info()
 }
 
-const lines = `
-line1
-line2
-	tab
-space	
-`
-
 func TestLog(t *testing.T) {
-	l := New(os.Stdout)
-	l.With().
-		Str("k", "xx").
-		Bool("out", false).
-		Bool("key", true).
-		Int("key", 1).
-		Int8("key", 2).
-		Int16("key", 3).
-		Int32("key", 4).
-		Int64("key", 5).
-		Uint("key", 6).
-		Uint8("key", 7).
-		Uint16("key", 8).
-		Uint32("key", 9).
-		Uint64("key", 10).
-		Float32("key", 11.98122).
-		Float64("key", 12.987654321).
-		Str("key", "a").
-		Bytes("key", []byte("b")).
-		Hex("key", []byte{0x1f}).
-		Time("key", time.Now()).
-		Dur("key", 0).Any("key-any", runtime.BlockProfileRecord{}).Info("xx")
-}
-func TestLog1(t *testing.T) {
-	SetCaller(true)
-	l := New(os.Stdout)
-	l.SetCaller(true)
-	l.With().Info()
-	Info("")
-	Errorf("")
-	l.With().RawJSON("x", []byte(lines)).Info()
-}
-func TestLog2(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetCaller(true)
 	ctx := TrackCtx(context.Background(), trace())
@@ -143,6 +99,19 @@ func TestLog2(t *testing.T) {
 	l.Ctx(ctx).Str("t", "xx").Str("tx", "tt").Info()
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Error()
+	s := l.Ctx(ctx)
+	s.Bool("b", false)
+	s.Info("666")
+	s.Info("xx")
+}
+func TestLog1(t *testing.T) {
+	l := New(os.Stdout)
+	l.SetCaller(true)
+	ctx := TrackCtx(context.Background(), trace())
+	l1 := l.Ctx(ctx).Str("basic", "basic")
+	l1.Debug()
+	l1.Info()
+	l1.Error()
 	s := l.Ctx(ctx)
 	s.Bool("b", false)
 	s.Info("666")
