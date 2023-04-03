@@ -23,5 +23,9 @@ func trace() string {
 	return *(*string)(unsafe.Pointer(&buf))
 }
 
+func TraceId() string {
+	return trace()
+}
+
 //go:linkname fastRand runtime.fastrand
 func fastRand() uint32
