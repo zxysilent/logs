@@ -2,21 +2,12 @@ package logs
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"os"
-	"runtime"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/zxysilent/logs/internal/buffer"
-	"github.com/zxysilent/logs/internal/encoder"
-)
-
-var (
-	enc = encoder.Encoder{}
+	"github.com/zxysilent/logs/internal/file"
 )
 
 // 日志等级
@@ -52,6 +43,7 @@ type Logger struct {
 	level  logLevel   // 日志等级
 	skip   int        //
 	mu     sync.Mutex // logger🔒
+	fw     *file.Writer
 }
 
 func New(out io.Writer) *Logger {
@@ -68,63 +60,85 @@ func New(out io.Writer) *Logger {
 	return n
 }
 
-// 设置实例等级
-func SetLevel(lv logLevel) {
-	log.SetLevel(lv)
+func (l *Logger) SetFile(path string) {
+	l.fw = file.New(path)
+	l.SetOutput(l.fw)
+}
+
+// SetMaxAge 最大保留天数
+func (l *Logger) SetMaxAge(ma int) {
+	if l.fw == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fw.SetMaxAge(ma)
+}
+
+// SetMaxSize 单个日志最大容量
+func (l *Logger) SetMaxSize(ms int64) {
+	if l.fw == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fw.SetMaxSize(ms)
+}
+
+// SetCons 同时输出控制台
+func (l *Logger) SetCons(b bool) {
+	if l.fw == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fw.SetCons(b)
+}
+
+func (l *Logger) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.fw != nil {
+		return l.fw.Close()
+	}
+	return nil
 }
 
 // 设置输出等级
-func (fl *Logger) SetLevel(lv logLevel) {
+func (l *Logger) SetLevel(lv logLevel) {
 	if lv < LDEBUG || lv > LERROR {
-		panic("非法的日志等级")
+		panic("logs: illegal log level")
 	}
-	fl.mu.Lock()
-	fl.level = lv
-	fl.mu.Unlock()
-}
-
-func SetCaller(b bool) {
-	log.SetCaller(b)
+	l.mu.Lock()
+	l.level = lv
+	l.mu.Unlock()
 }
 
 // 设置调用信息
-func (fl *Logger) SetCaller(b bool) {
-	fl.mu.Lock()
-	fl.caller = b
-	fl.mu.Unlock()
+func (l *Logger) SetCaller(b bool) {
+	l.mu.Lock()
+	l.caller = b
+	l.mu.Unlock()
 }
 
-func SetSep(sep string) {
-	log.SetSep(sep)
+func (l *Logger) SetSep(sep string) {
+	l.mu.Lock()
+	l.sep = sep
+	l.mu.Unlock()
 }
 
-func (fl *Logger) SetSep(sep string) {
-	fl.mu.Lock()
-	fl.sep = sep
-	fl.mu.Unlock()
+func (l *Logger) SetSkip(skip int) {
+	l.mu.Lock()
+	l.skip = skip
+	l.mu.Unlock()
 }
 
-func SetSkip(skip int) {
-	log.SetSkip(skip)
-}
-
-func (fl *Logger) SetSkip(skip int) {
-	fl.mu.Lock()
-	fl.skip = skip
-	fl.mu.Unlock()
-}
-func SetOutput(out io.Writer) {
-	log.SetOutput(out)
-}
-
-func (fl *Logger) SetOutput(out io.Writer) {
-	fl.mu.Lock()
-	fl.out = out
-	fl.mu.Unlock()
+func (l *Logger) SetOutput(out io.Writer) {
+	l.mu.Lock()
+	l.out = out
+	l.mu.Unlock()
 }
 func (l *Logger) Write(p []byte) (int, error) {
-	// l.mu.Lock()
-	// defer l.mu.Unlock()
 	return l.out.Write(p)
 }
 
@@ -146,159 +160,6 @@ func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
 	return f
 }
 
-const trackKey = "logs-track-id"
-
-func TrackCtx(ctx context.Context, trackid ...string) context.Context {
-	val := ctx.Value(trackKey)
-	if val == nil {
-		var id = ""
-		if len(trackid) == 0 {
-			id = trace()
-		} else {
-			id = trackid[0]
-		}
-		ctx = context.WithValue(ctx, trackKey, id)
-	}
-	return ctx
-}
-
-type FieldLogger struct {
-	ctx    context.Context
-	attr   *buffer.Buffer //调用输出后清空
-	buf    *buffer.Buffer //每次输出的时候重置
-	logger *Logger
-	caller bool
-}
-
-func (s *FieldLogger) Caller(b bool) *FieldLogger {
-	s.caller = b
-	return s
-}
-func header(ctx context.Context, caller bool, skip int, sep string, buf *buffer.Buffer, lv logLevel) {
-	*buf = enc.PutBeginMarker(*buf)
-	*buf = enc.PutTimeFast(enc.PutKey(*buf, timeFieldName), time.Now())
-	*buf = enc.PutString(enc.PutKey(*buf, levelFieldName), lv.String())
-	if ctx != nil {
-		val := ctx.Value(trackKey)
-		if val != nil {
-			if traceId, ok := val.(string); ok {
-				*buf = enc.PutString(enc.PutKey(*buf, traceFieldName), traceId)
-			}
-		}
-	}
-	if caller {
-		_, file, line, ok := runtime.Caller(skip + 3)
-		if !ok {
-			file = "###"
-			line = 1
-		} else {
-			slash := strings.LastIndex(file, sep)
-			if slash >= 0 {
-				file = file[slash:]
-			}
-		}
-		*buf = enc.PutString(enc.PutKey(*buf, callerFieldName), file+":"+strconv.Itoa(line))
-	}
-}
-
-func print(ctx context.Context, lv logLevel, caller bool, log *Logger, attr *buffer.Buffer, args ...interface{}) {
-	buf := buffer.Get()
-	header(ctx, caller, log.skip, log.sep, buf, lv)
-	if attr != nil && len(*attr) >= 1 {
-		*buf = append(*buf, ',')
-		*buf = append(*buf, *attr...)
-	}
-	if len(args) >= 1 {
-		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), fmt.Sprint(args...))
-	}
-	*buf = enc.PutEndMarker(*buf)
-	*buf = enc.PutLineBreak(*buf)
-	log.Write(*buf)
-	buffer.Put(buf)
-}
-
-func printf(ctx context.Context, lv logLevel, caller bool, log *Logger, attr *buffer.Buffer, format string, args ...interface{}) {
-	buf := buffer.Get()
-	header(ctx, caller, log.skip, log.sep, buf, lv)
-	if attr != nil && len(*attr) >= 1 {
-		*buf = append(*buf, ',')
-		*buf = append(*buf, *attr...)
-	}
-	if len(args) >= 1 {
-		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), fmt.Sprintf(format, args...))
-	} else {
-		*buf = enc.PutString(enc.PutKey(*buf, msgFieldName), format)
-	}
-	*buf = enc.PutEndMarker(*buf)
-	*buf = enc.PutLineBreak(*buf)
-	log.Write(*buf)
-	buffer.Put(buf)
-
-}
-func (fl *FieldLogger) Debug(args ...interface{}) {
-	if LDEBUG >= fl.logger.level {
-		print(fl.ctx, LDEBUG, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Debugf(foramt string, args ...interface{}) {
-	if LDEBUG >= fl.logger.level {
-		printf(fl.ctx, LDEBUG, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Info(args ...interface{}) {
-	if LINFO >= fl.logger.level {
-		print(fl.ctx, LINFO, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Infof(foramt string, args ...interface{}) {
-	if LINFO >= fl.logger.level {
-		printf(fl.ctx, LINFO, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Warn(args ...interface{}) {
-	if LWARN >= fl.logger.level {
-		print(fl.ctx, LWARN, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Warnf(foramt string, args ...interface{}) {
-	if LWARN >= fl.logger.level {
-		printf(fl.ctx, LWARN, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-func (fl *FieldLogger) Error(args ...interface{}) {
-	if LERROR >= fl.logger.level {
-		print(fl.ctx, LERROR, fl.caller && fl.logger.caller, fl.logger, fl.attr, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-func (fl *FieldLogger) Errorf(foramt string, args ...interface{}) {
-	if LERROR >= fl.logger.level {
-		printf(fl.ctx, LERROR, fl.caller && fl.logger.caller, fl.logger, fl.attr, foramt, args...)
-		buffer.Put(fl.attr)
-		fl.attr = nil
-	}
-}
-
-// ----------------------------------------------------------------
 func (l *Logger) Debug(args ...interface{}) {
 	if LDEBUG >= l.level {
 		print(nil, LDEBUG, l.caller, l, nil, args...)
@@ -347,62 +208,4 @@ func (l *Logger) Errorf(foramt string, args ...interface{}) {
 
 func (l *Logger) Writer() io.Writer {
 	return l
-}
-
-var log = New(os.Stdout)
-
-func Debug(args ...interface{}) {
-	if LDEBUG >= log.level {
-		print(nil, LDEBUG, log.caller, log, nil, args...)
-	}
-}
-
-func Debugf(foramt string, args ...interface{}) {
-	if LDEBUG >= log.level {
-		printf(nil, LDEBUG, log.caller, log, nil, foramt, args...)
-	}
-}
-
-func Info(args ...interface{}) {
-	if LINFO >= log.level {
-		print(nil, LINFO, log.caller, log, nil, args...)
-	}
-}
-
-func Infof(foramt string, args ...interface{}) {
-	if LINFO >= log.level {
-		printf(nil, LINFO, log.caller, log, nil, foramt, args...)
-	}
-}
-
-func Warn(args ...interface{}) {
-	if LWARN >= log.level {
-		print(nil, LWARN, log.caller, log, nil, args...)
-	}
-}
-
-func Warnf(foramt string, args ...interface{}) {
-	if LWARN >= log.level {
-		printf(nil, LWARN, log.caller, log, nil, foramt, args...)
-	}
-}
-
-func Error(args ...interface{}) {
-	if LERROR >= log.level {
-		print(nil, LERROR, log.caller, log, nil, args...)
-	}
-}
-
-func Errorf(foramt string, args ...interface{}) {
-	if LERROR >= log.level {
-		printf(nil, LERROR, log.caller, log, nil, foramt, args...)
-	}
-}
-
-func With() *FieldLogger {
-	return log.With()
-}
-
-func Ctx(ctx context.Context) *FieldLogger {
-	return log.Ctx(ctx)
 }

@@ -107,6 +107,8 @@ func TestLog(t *testing.T) {
 func TestLog1(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetCaller(true)
+	// l.SetFile("./logs1/app.log")
+	defer l.Close()
 	ctx := TrackCtx(context.Background(), trace())
 	l1 := l.Ctx(ctx).Str("basic", "basic")
 	l1.Debug()
@@ -116,6 +118,25 @@ func TestLog1(t *testing.T) {
 	s.Bool("b", false)
 	s.Info("666")
 	s.Info("xx")
+}
+func TestWriter(t *testing.T) {
+	SetFile("./logs/app.log")
+	SetCaller(true)
+	for i := 0; i < 10; i++ {
+		With().Int("idx", i).Debug()
+		With().Int("idx", i).Debug("debug")
+		With().Int("idx", i).Debugf("debugf")
+		With().Int("idx", i).Info()
+		With().Int("idx", i).Info("info")
+		With().Int("idx", i).Infof("infof")
+		With().Int("idx", i).Warn()
+		With().Int("idx", i).Warn("warn")
+		With().Int("idx", i).Warnf("warnf")
+		With().Int("idx", i).Error()
+		With().Int("idx", i).Error("erro")
+		With().Int("idx", i).Errorf("errorf")
+	}
+	Close()
 }
 
 // # 使用benchmark采集3秒的内存维度的数据，并生成文件

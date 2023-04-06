@@ -21,6 +21,7 @@ func trace() string {
 		idx++
 	}
 	return *(*string)(unsafe.Pointer(&buf))
+	// return unsafe.String(&buf[0], len(buf)) //1.20
 }
 
 func TraceId() string {
