@@ -53,8 +53,8 @@ func New(path string) *Writer {
 // SetMaxAge 最大保留天数
 func (w *Writer) SetMaxAge(ma int) {
 	w.mu.Lock()
-	defer w.mu.Lock()
 	w.maxAge = ma
+	w.mu.Unlock()
 }
 
 // SetMaxSize 单个日志最大容量
@@ -63,15 +63,15 @@ func (w *Writer) SetMaxSize(ms int64) {
 		return
 	}
 	w.mu.Lock()
-	defer w.mu.Lock()
 	w.maxSize = ms
+	w.mu.Unlock()
 }
 
 // SetCons 同时输出控制台
 func (w *Writer) SetCons(b bool) {
 	w.mu.Lock()
-	defer w.mu.Lock()
 	w.cons = b
+	w.mu.Unlock()
 }
 
 func (w *Writer) Write(p []byte) (n int, err error) {

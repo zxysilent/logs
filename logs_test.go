@@ -121,6 +121,7 @@ func TestLog1(t *testing.T) {
 }
 func TestWriter(t *testing.T) {
 	SetFile("./logs/app.log")
+	SetCons(true)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {
 		With().Int("idx", i).Debug()
