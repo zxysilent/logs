@@ -48,7 +48,30 @@ func BenchmarkParallel(b *testing.B) {
 		b.Fatalf("Log write count")
 	}
 }
-
+func BenchmarkLog(b *testing.B) {
+	l := New(os.Stdout)
+	l.SetFile("./logs/app.log")
+	for i := 0; i < b.N; i++ {
+		l.Info()
+	}
+}
+func BenchmarkParallelFile(b *testing.B) {
+	logger := New(nil)
+	logger.SetFile("./logs/app.log")
+	// logger.SetCaller(true)
+	// logger.caller = true
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			logger.With().
+				Str("str", "str").
+				Int("int", 1025).
+				Bool("bool", true).
+				Int("int", 64).
+				Int64("int64", 64).Info()
+		}
+	})
+}
 func TestLogger(t *testing.T) {
 	log.SetCaller(true)
 	Debug()

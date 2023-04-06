@@ -1,6 +1,7 @@
 package file
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ type Writer struct {
 	creates []byte    // 文件创建日期
 	cons    bool      // 标准输出  默认 false
 	file    *os.File
+	bw      *bufio.Writer
 	mu      sync.Mutex
 }
 
@@ -99,7 +101,8 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 			return 0, err
 		}
 	}
-	n, err = w.file.Write(p)
+	// n, err = w.file.Write(p)
+	n, err = w.bw.Write(p)
 	w.size += int64(n)
 	if err != nil {
 		return n, err
@@ -111,6 +114,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 func (w *Writer) rotate() error {
 	now := time.Now()
 	if w.file != nil {
+		w.bw.Flush()
 		w.file.Sync()
 		w.file.Close()
 		// 保存
@@ -130,6 +134,7 @@ func (w *Writer) rotate() error {
 		return err
 	}
 	w.file = fout
+	w.bw = bufio.NewWriter(w.file)
 	return nil
 }
 
@@ -176,6 +181,7 @@ func (w *Writer) close() error {
 	if w.file == nil {
 		return nil
 	}
+	w.bw.Flush()
 	w.file.Sync()
 	err := w.file.Close()
 	w.file = nil

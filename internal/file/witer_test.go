@@ -6,12 +6,13 @@ import (
 )
 
 func TestName2time(t *testing.T) {
-	f := New("./log/app.log")
+	f := New("../../logs/app.log")
+	t.Logf("%+v", f)
 	f.delete()
 }
 
 func TestReadDir(t *testing.T) {
-	dirs, err := os.ReadDir("./log")
+	dirs, err := os.ReadDir("../../logs")
 	if err != nil {
 		return
 	}
