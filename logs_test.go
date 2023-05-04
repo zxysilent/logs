@@ -116,7 +116,7 @@ func TestField(t *testing.T) {
 func TestLog(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetCaller(true)
-	ctx := TrackCtx(context.Background(), trace())
+	ctx := TraceCtx(context.Background(), trace())
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Str("t", "xx").Str("tx", "tt").Info()
@@ -132,7 +132,7 @@ func TestLog1(t *testing.T) {
 	l.SetCaller(true)
 	// l.SetFile("./logs1/app.log")
 	defer l.Close()
-	ctx := TrackCtx(context.Background(), trace())
+	ctx := TraceCtx(context.Background(), trace())
 	l1 := l.Ctx(ctx).Str("basic", "basic")
 	l1.Debug()
 	l1.Info()

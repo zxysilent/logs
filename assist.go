@@ -18,7 +18,7 @@ var (
 
 const tarceKey = "logs-tarce-id"
 
-func TrackCtx(ctx context.Context, tarceid ...string) context.Context {
+func TraceCtx(ctx context.Context, tarceid ...string) context.Context {
 	val := ctx.Value(tarceKey)
 	if val == nil {
 		var id = ""

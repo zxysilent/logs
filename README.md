@@ -64,7 +64,7 @@ func main() {
 				Uint8("uin8", 8).
 				Float32("float32", 3.14).Info()
     // 链路追踪
-    ctx := TrackCtx(context.Background())
+    ctx := TraceCtx(context.Background())
 	logger.Ctx(ctx).Str("basic", "basic").Debug()
 	// ------------------------- 使用自定义实例
 	// 适用于不同业务模块

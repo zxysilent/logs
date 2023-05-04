@@ -150,7 +150,7 @@ func (l *Logger) With() *FieldLogger {
 	return f
 }
 
-// tracking
+// tracing
 func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
 	f := &FieldLogger{}
 	f.ctx = ctx
