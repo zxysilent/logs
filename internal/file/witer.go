@@ -49,7 +49,13 @@ func New(path string) *Writer {
 	w.maxSize = sizeMiB * defMaxSize
 	w.maxAge = defMaxAge
 	os.MkdirAll(filepath.Dir(w.fpath), 0755)
+	go w.daemon()
 	return w
+}
+func (w *Writer) daemon() {
+	for range time.NewTicker(time.Second * 5).C {
+		w.flush()
+	}
 }
 
 // SetMaxAge 最大保留天数
@@ -171,19 +177,28 @@ func (w *Writer) time2name(t time.Time) string {
 }
 
 func (w *Writer) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	w.flush()
 	return w.close()
 }
 
 // close closes the file if it is open.
 func (w *Writer) close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if w.file == nil {
 		return nil
 	}
-	w.bw.Flush()
 	w.file.Sync()
 	err := w.file.Close()
 	w.file = nil
 	return err
+}
+
+func (w *Writer) flush() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.bw == nil {
+		return nil
+	}
+	return w.bw.Flush()
 }

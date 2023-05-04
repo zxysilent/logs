@@ -16,18 +16,18 @@ var (
 	enc = encoder.Encoder{}
 )
 
-const trackKey = "logs-track-id"
+const tarceKey = "logs-tarce-id"
 
-func TrackCtx(ctx context.Context, trackid ...string) context.Context {
-	val := ctx.Value(trackKey)
+func TrackCtx(ctx context.Context, tarceid ...string) context.Context {
+	val := ctx.Value(tarceKey)
 	if val == nil {
 		var id = ""
-		if len(trackid) == 0 {
+		if len(tarceid) == 0 {
 			id = trace()
 		} else {
-			id = trackid[0]
+			id = tarceid[0]
 		}
-		ctx = context.WithValue(ctx, trackKey, id)
+		ctx = context.WithValue(ctx, tarceKey, id)
 	}
 	return ctx
 }
@@ -37,7 +37,7 @@ func header(ctx context.Context, caller bool, skip int, sep string, buf *buffer.
 	*buf = enc.PutTimeFast(enc.PutKey(*buf, timeFieldName), time.Now())
 	*buf = enc.PutString(enc.PutKey(*buf, levelFieldName), lv.String())
 	if ctx != nil {
-		val := ctx.Value(trackKey)
+		val := ctx.Value(tarceKey)
 		if val != nil {
 			if traceId, ok := val.(string); ok {
 				*buf = enc.PutString(enc.PutKey(*buf, traceFieldName), traceId)

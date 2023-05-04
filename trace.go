@@ -14,11 +14,10 @@ const (
 // xxxxxxxx
 func trace() string {
 	buf := make([]byte, 8)
-	for idx, cache, remain := 0, fastRand(), 8; idx < 8; {
+	for idx, cache := 0, fastRand(); idx < 8; idx++ {
 		buf[idx] = traceStr[cache&traceMask]
 		cache >>= 4
-		remain--
-		idx++
+
 	}
 	return *(*string)(unsafe.Pointer(&buf))
 	// return unsafe.String(&buf[0], len(buf)) //1.20
