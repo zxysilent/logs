@@ -14,7 +14,7 @@ func (e Encoder) PutKey(dst []byte, key string) []byte {
 	if len(dst) > 0 {
 		dst = append(dst, ' ')
 	}
-	return append(e.PutString(dst, key), '=')
+	return append(e.quoteString(dst, key, true), '=')
 }
 
 // PutNil inserts a 'Nil' object into the dst byte array.

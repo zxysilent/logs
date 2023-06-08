@@ -2,6 +2,7 @@ package text
 
 import (
 	"fmt"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -24,7 +25,15 @@ func init() {
 // entirety to the byte slice.
 // If we encounter a byte that does need encoding, switch up
 // the operation and perform a byte-by-byte read-encode-append.
-func (Encoder) PutString(dst []byte, s string) []byte {
+func (enc Encoder) PutString(dst []byte, s string) []byte {
+	return enc.quoteString(dst, s, true)
+}
+
+func (Encoder) quoteString(dst []byte, s string, quote bool) []byte {
+	quote = quote && strings.ContainsAny(s, "	 ")
+	if quote {
+		dst = append(dst, '"')
+	}
 	// Start with a double quote.
 	// Loop through each character in the string.
 	for i := 0; i < len(s); i++ {
@@ -34,13 +43,21 @@ func (Encoder) PutString(dst []byte, s string) []byte {
 		if !noEscapeTable[s[i]] {
 			// We encountered a character that needs to be encoded. Switch
 			// to complex version of the algorithm.
-			return appendStringComplex(dst, s, i)
+			dst = appendStringComplex(dst, s, i)
+			if quote {
+				dst = append(dst, '"')
+			}
+			return dst
 		}
 	}
 	// The string has no need for encoding and therefore is directly
 	// appended to the byte slice.
-	return append(dst, s...)
+	dst = append(dst, s...)
 	// End with a double quote
+	if quote {
+		dst = append(dst, '"')
+	}
+	return dst
 }
 
 // PutStringer encodes the input Stringer to json and appends the

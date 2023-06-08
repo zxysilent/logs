@@ -162,6 +162,7 @@ func TestWriter(t *testing.T) {
 		With().Int("idx", i).Error("erro")
 		With().Int("idx", i).Errorf("errorf")
 	}
+	With().Str("idx", "sp ce").Errorf("omit empty")
 	Close()
 }
 
