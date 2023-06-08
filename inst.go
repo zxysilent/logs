@@ -27,6 +27,15 @@ func SetSkip(skip int) {
 func SetOutput(out io.Writer) {
 	log.SetOutput(out)
 }
+
+func SetJSON() {
+	log.SetJSON()
+}
+
+func SetText() {
+	log.SetText()
+}
+
 func Debug(args ...interface{}) {
 	if LDEBUG >= log.level {
 		print(nil, LDEBUG, log.caller, log, nil, args...)
@@ -90,6 +99,7 @@ func Close() error {
 func SetFile(path string) {
 	log.SetFile(path)
 }
+
 func SetMaxAge(ma int) {
 	log.SetMaxAge(ma)
 }

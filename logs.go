@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/zxysilent/logs/internal/buffer"
+	"github.com/zxysilent/logs/internal/encoder"
+	"github.com/zxysilent/logs/internal/encoder/json"
+	"github.com/zxysilent/logs/internal/encoder/text"
 	"github.com/zxysilent/logs/internal/file"
 )
 
@@ -21,14 +23,13 @@ const (
 	logShort = "DBGINFWRNERR" //DBG INF WRN ERR
 )
 const (
-	timeFieldName     = "time"
-	traceFieldName    = "trace"
-	levelFieldName    = "level"
-	msgFieldName      = "msg"
-	errorFieldName    = "error"
-	callerFieldName   = "caller"
-	timeFieldFormat   = "2006/01/02 15:04:05.000"
-	durationFieldUnit = time.Millisecond
+	timeFieldName   = "time"
+	traceFieldName  = "trace"
+	levelFieldName  = "level"
+	msgFieldName    = "msg"
+	errorFieldName  = "error"
+	callerFieldName = "caller"
+	timeFieldFormat = "2006/01/02 15:04:05.000"
 )
 
 // 字符串等级
@@ -37,12 +38,13 @@ func (lv logLevel) String() string {
 }
 
 type Logger struct {
-	out    io.Writer  // 输出
-	sep    string     // 路径分隔
-	caller bool       // 调用信息
-	level  logLevel   // 日志等级
-	skip   int        //
-	mu     sync.Mutex // logger🔒
+	out    io.Writer       // 输出
+	sep    string          // 路径分隔
+	caller bool            // 调用信息
+	level  logLevel        // 日志等级
+	skip   int             //
+	enc    encoder.Encoder //
+	mu     sync.Mutex      // logger🔒
 	fw     *file.Writer
 }
 
@@ -57,6 +59,7 @@ func New(out io.Writer) *Logger {
 		skip:   0,
 		sep:    "/",
 	}
+	n.enc = &json.Encoder{}
 	return n
 }
 
@@ -121,6 +124,14 @@ func (l *Logger) SetCaller(b bool) {
 	l.mu.Unlock()
 }
 
+func (l *Logger) SetJSON() {
+	l.enc = &json.Encoder{}
+}
+
+func (l *Logger) SetText() {
+	l.enc = &text.Encoder{}
+}
+
 func (l *Logger) SetSep(sep string) {
 	l.mu.Lock()
 	l.sep = sep
@@ -144,6 +155,7 @@ func (l *Logger) Write(p []byte) (int, error) {
 
 func (l *Logger) With() *FieldLogger {
 	f := &FieldLogger{}
+	f.enc = l.enc
 	f.logger = l
 	f.caller = l.caller
 	f.attr = buffer.Get()
@@ -153,6 +165,7 @@ func (l *Logger) With() *FieldLogger {
 // tracing
 func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
 	f := &FieldLogger{}
+	f.enc = l.enc
 	f.ctx = ctx
 	f.logger = l
 	f.caller = l.caller

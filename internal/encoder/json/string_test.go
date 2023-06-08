@@ -1,4 +1,4 @@
-package encoder
+package json
 
 import (
 	"testing"
@@ -64,6 +64,7 @@ var encodeHexTests = []struct {
 }
 
 func TestPutString(t *testing.T) {
+	var enc = Encoder{}
 	for _, tt := range encodeStringTests {
 		b := enc.PutString([]byte{}, tt.in)
 		if got, want := string(b), tt.out; got != want {
@@ -73,6 +74,7 @@ func TestPutString(t *testing.T) {
 }
 
 func BenchmarkPutString(b *testing.B) {
+	var enc = Encoder{}
 	tests := map[string]string{
 		"NoEncoding":       `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
 		"EncodingFirst":    `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,

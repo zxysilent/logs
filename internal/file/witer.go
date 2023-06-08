@@ -28,7 +28,7 @@ type Writer struct {
 	fname   string    // 文件名
 	fsuffix string    // 文件后缀名 默认 .log
 	created time.Time // 文件创建日期
-	creates []byte    // 文件创建日期
+	creates []byte    // 文件创建日期 for compare
 	cons    bool      // 标准输出  默认 false
 	file    *os.File
 	bw      *bufio.Writer
@@ -82,6 +82,16 @@ func (w *Writer) SetCons(b bool) {
 	w.mu.Unlock()
 }
 
+func (w *Writer) equalDate(file []byte, msg []byte) bool {
+	// Only supports zxysilent/logs
+	if len(file) < 10 || len(msg) < 20 {
+		return true
+	}
+	if bytes.HasPrefix(msg, []byte("time")) { //for text
+		return bytes.Equal(file[:10], msg[5:15])
+	}
+	return bytes.Equal(file[:10], msg[9:19]) ///for json
+}
 func (w *Writer) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -95,7 +105,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		}
 	}
 	// 按天切割
-	if !bytes.Equal(w.creates[:10], p[9:19]) { //2023-04-05
+	if !w.equalDate(w.creates, p) { //2023-04-05
 		go w.delete() // 每天检测一次旧文件
 		if err := w.rotate(); err != nil {
 			return 0, err

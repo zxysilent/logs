@@ -1,13 +1,13 @@
-package encoder
+package text
 
 import (
 	"math"
-	"net"
 	"reflect"
 	"testing"
 )
 
 func TestPutType(t *testing.T) {
+	var enc = Encoder{}
 	w := map[string]func(interface{}) []byte{
 		"PutInt":     func(v interface{}) []byte { return enc.PutInt([]byte{}, v.(int)) },
 		"PutInt8":    func(v interface{}) []byte { return enc.PutInt8([]byte{}, v.(int8)) },
@@ -58,48 +58,6 @@ func TestPutType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := w[tt.fn](tt.input); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got %s, want %s", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_appendType(t *testing.T) {
-	typeTests := []struct {
-		label string
-		input interface{}
-		want  []byte
-	}{
-		{"int", 42, []byte(`"int"`)},
-		{"MAC", net.HardwareAddr{0x12, 0x34, 0x00, 0x00, 0x90, 0xab}, []byte(`"net.HardwareAddr"`)},
-		{"float64", float64(2.50), []byte(`"float64"`)},
-		{"nil", nil, []byte(`"<nil>"`)},
-		{"bool", true, []byte(`"bool"`)},
-	}
-
-	for _, tt := range typeTests {
-		t.Run(tt.label, func(t *testing.T) {
-			if got := enc.PutType([]byte{}, tt.input); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("appendType() = %s, want %s", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_appendObjectData(t *testing.T) {
-	tests := []struct {
-		dst  []byte
-		obj  []byte
-		want []byte
-	}{
-		{[]byte{}, []byte(`{"foo":"bar"}`), []byte(`"foo":"bar"}`)},
-		{[]byte(`{"qux":"quz"`), []byte(`{"foo":"bar"}`), []byte(`{"qux":"quz","foo":"bar"}`)},
-		{[]byte{}, []byte(`"foo":"bar"`), []byte(`"foo":"bar"`)},
-		{[]byte(`{"qux":"quz"`), []byte(`"foo":"bar"`), []byte(`{"qux":"quz","foo":"bar"`)},
-	}
-	for _, tt := range tests {
-		t.Run("ObjectData", func(t *testing.T) {
-			if got := enc.PutObjectData(tt.dst, tt.obj); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("appendObjectData() = %s, want %s", got, tt.want)
 			}
 		})
 	}

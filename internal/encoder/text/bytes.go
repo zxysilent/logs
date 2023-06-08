@@ -1,31 +1,15 @@
-package encoder
+package text
 
 import "unicode/utf8"
 
 // PutBytes is a mirror of appendString with []byte arg
 func (Encoder) PutBytes(dst, s []byte) []byte {
-	dst = append(dst, '"')
 	for i := 0; i < len(s); i++ {
 		if !noEscapeTable[s[i]] {
-			dst = appendBytesComplex(dst, s, i)
-			return append(dst, '"')
+			return appendBytesComplex(dst, s, i)
 		}
 	}
-	dst = append(dst, s...)
-	return append(dst, '"')
-}
-
-// PutHex encodes the input bytes to a hex string and appends
-// the encoded string to the input byte slice.
-//
-// The operation loops though each byte and encodes it as hex using
-// the hex lookup table.
-func (Encoder) PutHex(dst, s []byte) []byte {
-	dst = append(dst, '"')
-	for _, v := range s {
-		dst = append(dst, hex[v>>4], hex[v&0x0f])
-	}
-	return append(dst, '"')
+	return append(dst, s...)
 }
 
 // appendBytesComplex is a mirror of the appendStringComplex

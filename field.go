@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/zxysilent/logs/internal/buffer"
+	"github.com/zxysilent/logs/internal/encoder"
 )
 
 type FieldLogger struct {
@@ -11,6 +12,7 @@ type FieldLogger struct {
 	attr   *buffer.Buffer //调用输出后清空
 	buf    *buffer.Buffer //每次输出的时候重置
 	logger *Logger
+	enc    encoder.Encoder
 	caller bool
 }
 

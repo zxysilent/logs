@@ -25,6 +25,7 @@ func (s *blackholeStream) Write(p []byte) (int, error) {
 func BenchmarkParallel(b *testing.B) {
 	stream := &blackholeStream{}
 	logger := New(stream)
+	logger.SetText()
 	// logger.SetCaller(true)
 	// logger.caller = true
 	b.ResetTimer()
@@ -107,7 +108,6 @@ func TestField(t *testing.T) {
 		Float64("key", 12.987654321).
 		Str("key", "a").
 		Bytes("key", []byte("b")).
-		Hex("key", []byte{0x1f}).
 		Time("key", time.Time{}).
 		Dur("key", 0).Any("key-any", runtime.BlockProfileRecord{})
 	f.Info()
@@ -144,6 +144,8 @@ func TestLog1(t *testing.T) {
 }
 func TestWriter(t *testing.T) {
 	SetFile("./logs/app.log")
+	// SetText()
+	SetText()
 	SetCons(true)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {

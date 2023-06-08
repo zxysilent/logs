@@ -1,4 +1,4 @@
-package encoder
+package text
 
 import (
 	"fmt"
@@ -15,23 +15,6 @@ func init() {
 	}
 }
 
-// PutStrings encodes the input strings to json and
-// appends the encoded string list to the input byte slice.
-func (e Encoder) PutStrings(dst []byte, vals []string) []byte {
-	if len(vals) == 0 {
-		return append(dst, '[', ']')
-	}
-	dst = append(dst, '[')
-	dst = e.PutString(dst, vals[0])
-	if len(vals) > 1 {
-		for _, val := range vals[1:] {
-			dst = e.PutString(append(dst, ','), val)
-		}
-	}
-	dst = append(dst, ']')
-	return dst
-}
-
 // PutString encodes the input string to json and appends
 // the encoded string to the input byte slice.
 //
@@ -43,7 +26,6 @@ func (e Encoder) PutStrings(dst []byte, vals []string) []byte {
 // the operation and perform a byte-by-byte read-encode-append.
 func (Encoder) PutString(dst []byte, s string) []byte {
 	// Start with a double quote.
-	dst = append(dst, '"')
 	// Loop through each character in the string.
 	for i := 0; i < len(s); i++ {
 		// Check if the character needs encoding. Control characters, slashes,
@@ -52,31 +34,13 @@ func (Encoder) PutString(dst []byte, s string) []byte {
 		if !noEscapeTable[s[i]] {
 			// We encountered a character that needs to be encoded. Switch
 			// to complex version of the algorithm.
-			dst = appendStringComplex(dst, s, i)
-			return append(dst, '"')
+			return appendStringComplex(dst, s, i)
 		}
 	}
 	// The string has no need for encoding and therefore is directly
 	// appended to the byte slice.
-	dst = append(dst, s...)
+	return append(dst, s...)
 	// End with a double quote
-	return append(dst, '"')
-}
-
-// PutStringers encodes the provided Stringer list to json and
-// appends the encoded Stringer list to the input byte slice.
-func (e Encoder) PutStringers(dst []byte, vals []fmt.Stringer) []byte {
-	if len(vals) == 0 {
-		return append(dst, '[', ']')
-	}
-	dst = append(dst, '[')
-	dst = e.PutStringer(dst, vals[0])
-	if len(vals) > 1 {
-		for _, val := range vals[1:] {
-			dst = e.PutStringer(append(dst, ','), val)
-		}
-	}
-	return append(dst, ']')
 }
 
 // PutStringer encodes the input Stringer to json and appends the

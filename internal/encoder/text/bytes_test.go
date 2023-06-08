@@ -1,13 +1,12 @@
-package encoder
+package text
 
 import (
 	"testing"
 	"unicode"
 )
 
-var enc = Encoder{}
-
 func TestPutBytes(t *testing.T) {
+	var enc = Encoder{}
 	for _, tt := range encodeStringTests {
 		b := enc.PutBytes([]byte{}, []byte(tt.in))
 		if got, want := string(b), tt.out; got != want {
@@ -16,17 +15,9 @@ func TestPutBytes(t *testing.T) {
 	}
 }
 
-func TestPutHex(t *testing.T) {
-	for _, tt := range encodeHexTests {
-		b := enc.PutHex([]byte{}, []byte{tt.in})
-		if got, want := string(b), tt.out; got != want {
-			t.Errorf("appendHex(%x) = %s, want %s", tt.in, got, want)
-		}
-	}
-}
-
 func TestStringBytes(t *testing.T) {
 	t.Parallel()
+	var enc = Encoder{}
 	// Test that encodeState.stringBytes and encodeState.string use the same encoding.
 	var r []rune
 	for i := '\u0000'; i <= unicode.MaxRune; i++ {
@@ -63,6 +54,7 @@ func TestStringBytes(t *testing.T) {
 }
 
 func BenchmarkPutBytes(b *testing.B) {
+	var enc = Encoder{}
 	tests := map[string]string{
 		"NoEncoding":       `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
 		"EncodingFirst":    `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
