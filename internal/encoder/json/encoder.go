@@ -19,7 +19,7 @@ func (e Encoder) PutKey(dst []byte, key string) []byte {
 
 // PutNil inserts a 'Nil' object into the dst byte array.
 func (Encoder) PutNil(dst []byte) []byte {
-	return append(dst, "nil"...)
+	return append(dst, "null"...)
 }
 
 // PutBegin inserts a map start into the dst byte array.

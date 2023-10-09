@@ -59,7 +59,7 @@ func New(out io.Writer) *Logger {
 		skip:   0,
 		sep:    "/",
 	}
-	n.enc = &json.Encoder{}
+	n.enc = &text.Encoder{}
 	return n
 }
 

@@ -17,7 +17,6 @@ func trace() string {
 	for idx, cache := 0, fastRand(); idx < 8; idx++ {
 		buf[idx] = traceStr[cache&traceMask]
 		cache >>= 4
-
 	}
 	return *(*string)(unsafe.Pointer(&buf))
 	// return unsafe.String(&buf[0], len(buf)) //1.20

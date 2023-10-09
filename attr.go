@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-func (s *FieldLogger) appendJSON(dst []byte, j []byte) []byte {
-	return append(dst, j...)
-}
-
 func (s *FieldLogger) Str(key, val string) *FieldLogger {
 	if s.attr == nil {
 		return s
@@ -44,7 +40,6 @@ func (s *FieldLogger) Err(err error) *FieldLogger {
 	}
 	if err == nil {
 		*s.attr = s.enc.PutNil(s.enc.PutKey(*s.attr, errorFieldName))
-
 	} else {
 		*s.attr = s.enc.PutString(s.enc.PutKey(*s.attr, errorFieldName), err.Error())
 	}
@@ -177,10 +172,10 @@ func (s *FieldLogger) Any(key string, i interface{}) *FieldLogger {
 	return s
 }
 
-func (s *FieldLogger) RawJSON(key string, b []byte) *FieldLogger {
+func (s *FieldLogger) Raw(key string, b []byte) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.appendJSON(s.enc.PutKey(*s.attr, key), b)
+	*s.attr = append(s.enc.PutKey(*s.attr, key), b...)
 	return s
 }
