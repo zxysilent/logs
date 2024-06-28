@@ -9,7 +9,7 @@ type Buffer []byte
 
 // Having an initial size gives a dramatic speedup.
 var pool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		b := make([]byte, 0, 512)
 		return (*Buffer)(&b)
 	},
@@ -18,16 +18,20 @@ var pool = sync.Pool{
 func Get() *Buffer {
 	return pool.Get().(*Buffer)
 }
+
+const maxBufferSize = 4 << 10
+
 func Put(b *Buffer) {
 	if b == nil {
 		return
 	}
 	// To reduce peak allocation, return only smaller buffers to the pool.
-	const maxBufferSize = 8 << 10
 	if cap(*b) <= maxBufferSize {
 		*b = (*b)[:0]
 		pool.Put(b)
+		return
 	}
+	b = nil
 }
 
 func (b *Buffer) Reset() {

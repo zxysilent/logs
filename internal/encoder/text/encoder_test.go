@@ -8,24 +8,24 @@ import (
 
 func TestPutType(t *testing.T) {
 	var enc = Encoder{}
-	w := map[string]func(interface{}) []byte{
-		"PutInt":     func(v interface{}) []byte { return enc.PutInt([]byte{}, v.(int)) },
-		"PutInt8":    func(v interface{}) []byte { return enc.PutInt8([]byte{}, v.(int8)) },
-		"PutInt16":   func(v interface{}) []byte { return enc.PutInt16([]byte{}, v.(int16)) },
-		"PutInt32":   func(v interface{}) []byte { return enc.PutInt32([]byte{}, v.(int32)) },
-		"PutInt64":   func(v interface{}) []byte { return enc.PutInt64([]byte{}, v.(int64)) },
-		"PutUint":    func(v interface{}) []byte { return enc.PutUint([]byte{}, v.(uint)) },
-		"PutUint8":   func(v interface{}) []byte { return enc.PutUint8([]byte{}, v.(uint8)) },
-		"PutUint16":  func(v interface{}) []byte { return enc.PutUint16([]byte{}, v.(uint16)) },
-		"PutUint32":  func(v interface{}) []byte { return enc.PutUint32([]byte{}, v.(uint32)) },
-		"PutUint64":  func(v interface{}) []byte { return enc.PutUint64([]byte{}, v.(uint64)) },
-		"PutFloat32": func(v interface{}) []byte { return enc.PutFloat32([]byte{}, v.(float32)) },
-		"PutFloat64": func(v interface{}) []byte { return enc.PutFloat64([]byte{}, v.(float64)) },
+	w := map[string]func(any) []byte{
+		"PutInt":     func(v any) []byte { return enc.PutInt([]byte{}, v.(int)) },
+		"PutInt8":    func(v any) []byte { return enc.PutInt8([]byte{}, v.(int8)) },
+		"PutInt16":   func(v any) []byte { return enc.PutInt16([]byte{}, v.(int16)) },
+		"PutInt32":   func(v any) []byte { return enc.PutInt32([]byte{}, v.(int32)) },
+		"PutInt64":   func(v any) []byte { return enc.PutInt64([]byte{}, v.(int64)) },
+		"PutUint":    func(v any) []byte { return enc.PutUint([]byte{}, v.(uint)) },
+		"PutUint8":   func(v any) []byte { return enc.PutUint8([]byte{}, v.(uint8)) },
+		"PutUint16":  func(v any) []byte { return enc.PutUint16([]byte{}, v.(uint16)) },
+		"PutUint32":  func(v any) []byte { return enc.PutUint32([]byte{}, v.(uint32)) },
+		"PutUint64":  func(v any) []byte { return enc.PutUint64([]byte{}, v.(uint64)) },
+		"PutFloat32": func(v any) []byte { return enc.PutFloat32([]byte{}, v.(float32)) },
+		"PutFloat64": func(v any) []byte { return enc.PutFloat64([]byte{}, v.(float64)) },
 	}
 	tests := []struct {
 		name  string
 		fn    string
-		input interface{}
+		input any
 		want  []byte
 	}{
 		{"PutInt8(math.MaxInt8)", "PutInt8", int8(math.MaxInt8), []byte("127")},

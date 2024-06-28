@@ -140,7 +140,7 @@ func (Encoder) PutFloat64(dst []byte, val float64) []byte {
 
 // PutInterface marshals the input interface to a string and
 // appends the encoded string to the input byte slice.
-func (e Encoder) PutAny(dst []byte, i interface{}) []byte {
+func (e Encoder) PutAny(dst []byte, i any) []byte {
 	marshaled, err := json.Marshal(i)
 	if err != nil {
 		return e.PutString(dst, fmt.Sprintf("marshaling error: %v", err))

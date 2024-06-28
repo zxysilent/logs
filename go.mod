@@ -1,5 +1,5 @@
 module github.com/zxysilent/logs
 
-go 1.16
+go 1.20
 
-require xorm.io/xorm v1.3.2
+require xorm.io/xorm v1.3.9

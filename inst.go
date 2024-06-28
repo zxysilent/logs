@@ -36,51 +36,51 @@ func SetText() {
 	log.SetText()
 }
 
-func Debug(args ...interface{}) {
+func Debug(args ...any) {
 	if LDEBUG >= log.level {
-		print(nil, LDEBUG, log.caller, log, nil, args...)
+		print("", LDEBUG, log.caller, log, nil, args...)
 	}
 }
 
-func Debugf(foramt string, args ...interface{}) {
+func Debugf(foramt string, args ...any) {
 	if LDEBUG >= log.level {
-		printf(nil, LDEBUG, log.caller, log, nil, foramt, args...)
+		printf("", LDEBUG, log.caller, log, nil, foramt, args...)
 	}
 }
 
-func Info(args ...interface{}) {
+func Info(args ...any) {
 	if LINFO >= log.level {
-		print(nil, LINFO, log.caller, log, nil, args...)
+		print("", LINFO, log.caller, log, nil, args...)
 	}
 }
 
-func Infof(foramt string, args ...interface{}) {
+func Infof(foramt string, args ...any) {
 	if LINFO >= log.level {
-		printf(nil, LINFO, log.caller, log, nil, foramt, args...)
+		printf("", LINFO, log.caller, log, nil, foramt, args...)
 	}
 }
 
-func Warn(args ...interface{}) {
+func Warn(args ...any) {
 	if LWARN >= log.level {
-		print(nil, LWARN, log.caller, log, nil, args...)
+		print("", LWARN, log.caller, log, nil, args...)
 	}
 }
 
-func Warnf(foramt string, args ...interface{}) {
+func Warnf(foramt string, args ...any) {
 	if LWARN >= log.level {
-		printf(nil, LWARN, log.caller, log, nil, foramt, args...)
+		printf("", LWARN, log.caller, log, nil, foramt, args...)
 	}
 }
 
-func Error(args ...interface{}) {
+func Error(args ...any) {
 	if LERROR >= log.level {
-		print(nil, LERROR, log.caller, log, nil, args...)
+		print("", LERROR, log.caller, log, nil, args...)
 	}
 }
 
-func Errorf(foramt string, args ...interface{}) {
+func Errorf(foramt string, args ...any) {
 	if LERROR >= log.level {
-		printf(nil, LERROR, log.caller, log, nil, foramt, args...)
+		printf("", LERROR, log.caller, log, nil, foramt, args...)
 	}
 }
 

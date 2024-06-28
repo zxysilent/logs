@@ -166,56 +166,56 @@ func (l *Logger) With() *FieldLogger {
 func (l *Logger) Ctx(ctx context.Context) *FieldLogger {
 	f := &FieldLogger{}
 	f.enc = l.enc
-	f.ctx = ctx
+	f.trace, _ = ctx.Value(traceKey).(string)
 	f.logger = l
 	f.caller = l.caller
 	f.attr = buffer.Get()
 	return f
 }
 
-func (l *Logger) Debug(args ...interface{}) {
+func (l *Logger) Debug(args ...any) {
 	if LDEBUG >= l.level {
-		print(nil, LDEBUG, l.caller, l, nil, args...)
+		print("", LDEBUG, l.caller, l, nil, args...)
 	}
 }
-func (l *Logger) Debugf(foramt string, args ...interface{}) {
+func (l *Logger) Debugf(foramt string, args ...any) {
 	if LDEBUG >= l.level {
-		printf(nil, LDEBUG, l.caller, l, nil, foramt, args...)
+		printf("", LDEBUG, l.caller, l, nil, foramt, args...)
 	}
 }
 
-func (l *Logger) Info(args ...interface{}) {
+func (l *Logger) Info(args ...any) {
 	if LINFO >= l.level {
-		print(nil, LINFO, l.caller, l, nil, args...)
+		print("", LINFO, l.caller, l, nil, args...)
 	}
 }
 
-func (l *Logger) Infof(foramt string, args ...interface{}) {
+func (l *Logger) Infof(foramt string, args ...any) {
 	if LINFO >= l.level {
-		printf(nil, LINFO, l.caller, l, nil, foramt, args...)
+		printf("", LINFO, l.caller, l, nil, foramt, args...)
 	}
 }
 
-func (l *Logger) Warn(args ...interface{}) {
+func (l *Logger) Warn(args ...any) {
 	if LWARN >= l.level {
-		print(nil, LWARN, l.caller, l, nil, args...)
+		print("", LWARN, l.caller, l, nil, args...)
 	}
 }
 
-func (l *Logger) Warnf(foramt string, args ...interface{}) {
+func (l *Logger) Warnf(foramt string, args ...any) {
 	if LWARN >= l.level {
-		printf(nil, LWARN, l.caller, l, nil, foramt, args...)
+		printf("", LWARN, l.caller, l, nil, foramt, args...)
 	}
 }
-func (l *Logger) Error(args ...interface{}) {
+func (l *Logger) Error(args ...any) {
 	if LERROR >= l.level {
-		print(nil, LERROR, l.caller, l, nil, args...)
+		print("", LERROR, l.caller, l, nil, args...)
 	}
 }
 
-func (l *Logger) Errorf(foramt string, args ...interface{}) {
+func (l *Logger) Errorf(foramt string, args ...any) {
 	if LERROR >= l.level {
-		printf(nil, LERROR, l.caller, l, nil, foramt, args...)
+		printf("", LERROR, l.caller, l, nil, foramt, args...)
 	}
 }
 

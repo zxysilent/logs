@@ -164,7 +164,7 @@ func (s *FieldLogger) Dur(key string, d time.Duration) *FieldLogger {
 	return s
 }
 
-func (s *FieldLogger) Any(key string, i interface{}) *FieldLogger {
+func (s *FieldLogger) Any(key string, i any) *FieldLogger {
 	if s.attr == nil {
 		return s
 	}

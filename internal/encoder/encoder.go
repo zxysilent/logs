@@ -27,7 +27,7 @@ type Encoder interface {
 	PutInt32(dst []byte, val int32) []byte
 	PutInt64(dst []byte, val int64) []byte
 	PutInt8(dst []byte, val int8) []byte
-	PutAny(dst []byte, i interface{}) []byte
+	PutAny(dst []byte, i any) []byte
 	PutKey(dst []byte, key string) []byte
 	PutNil(dst []byte) []byte
 	PutString(dst []byte, s string) []byte
