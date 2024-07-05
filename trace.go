@@ -7,24 +7,23 @@ import (
 // go clean -testcache // Delete all cached test results
 
 const (
-	traceStr  = "0123456789abcdef" //16
-	traceMask = 1<<4 - 1           //1111
+	traceStr  = "23456789abcdefghijkmnpqrstuvwxyz" //32
+	traceMask = 1<<5 - 1                           //11111
+	traceSize = 8                                  //6-16
 )
 
-// xxxxxxxx
 func trace() string {
-	buf := make([]byte, 8)
-	for idx, cache := 0, fastRand(); idx < 8; idx++ {
+	buf := make([]byte, traceSize)
+	for idx, cache := 0, fastRand(); idx < traceSize; {
 		buf[idx] = traceStr[cache&traceMask]
-		cache >>= 4
+		cache >>= 4 //hacker
+		idx++
 	}
-	return *(*string)(unsafe.Pointer(&buf))
-	// return unsafe.String(&buf[0], len(buf)) //1.20
+	return unsafe.String(&buf[0], len(buf))
 }
-
 func TraceId() string {
 	return trace()
 }
 
-//go:linkname fastRand runtime.fastrand
-func fastRand() uint32
+//go:linkname fastRand runtime.fastrand64
+func fastRand() uint64
