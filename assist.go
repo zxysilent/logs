@@ -1,7 +1,6 @@
 package logs
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -10,27 +9,6 @@ import (
 
 	"github.com/zxysilent/logs/internal/buffer"
 )
-
-const traceKey = "zlogs-trace-id"
-
-func TraceCtx(ctx context.Context, tarceid ...string) context.Context {
-	val := ctx.Value(traceKey)
-	if val == nil {
-		var id = ""
-		if len(tarceid) == 0 {
-			id = trace()
-		} else {
-			id = tarceid[0]
-		}
-		ctx = context.WithValue(ctx, traceKey, id)
-	}
-	return ctx
-}
-
-func TraceOf(ctx context.Context) string {
-	traceId, _ := ctx.Value(traceKey).(string)
-	return traceId
-}
 
 func header(trace string, caller bool, log *Logger, buf *buffer.Buffer, lv logLevel) {
 	*buf = log.enc.PutBegin(*buf)
