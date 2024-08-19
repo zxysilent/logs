@@ -13,8 +13,7 @@ package logs
 // func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
 // 	if ctx.ExecuteTime > 100*time.Millisecond {
 // 		logs.Ctx(ctx.Ctx).Caller(false).Str("SlowSQL", ctx.SQL).Any("args", ctx.Args).Dur("dur", ctx.ExecuteTime).Warn()
-// 	}
-// 	if rh.showSql {
+// 	} else if rh.showSql {
 // 		logs.Ctx(ctx.Ctx).Caller(false).Str("SQL", ctx.SQL).Any("args", ctx.Args).Dur("dur", ctx.ExecuteTime).Debug()
 // 	}
 // 	return ctx.Err
