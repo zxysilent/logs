@@ -33,6 +33,7 @@ type Writer struct {
 	file    *os.File
 	bw      *bufio.Writer
 	mu      sync.Mutex
+	tk      *time.Ticker
 }
 
 func New(path string) *Writer {
@@ -49,11 +50,12 @@ func New(path string) *Writer {
 	w.maxSize = sizeMiB * defMaxSize
 	w.maxAge = defMaxAge
 	os.MkdirAll(filepath.Dir(w.fpath), 0755)
+	w.tk = time.NewTicker(time.Second * 5)
 	go w.daemon()
 	return w
 }
 func (w *Writer) daemon() {
-	for range time.NewTicker(time.Second * 5).C {
+	for range w.tk.C {
 		w.flush()
 	}
 }
@@ -187,6 +189,7 @@ func (w *Writer) time2name(t time.Time) string {
 }
 
 func (w *Writer) Close() error {
+	w.tk.Stop()
 	w.flush()
 	return w.close()
 }
