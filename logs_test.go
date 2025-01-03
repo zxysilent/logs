@@ -2,12 +2,100 @@ package logs
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestInst(t *testing.T) {
+	SetCaller(true)
+	SetLevel(LDEBUG)
+	SetJSON()
+	SetSep("/")
+	SetSkip(1)
+	SetOutput(io.Discard)
+	SetMaxAge(1)
+	SetMaxSize(1024)
+	Debug("Debug")
+	Debugf("%s", "Debugf")
+	Info("Info")
+	Infof("%s", "Infof")
+	Warn("Warn")
+	Warnf("%s", "Warnf")
+	Error("Error")
+	Errorf("%s", "Errorf")
+	Ctx(context.TODO()).Info()
+}
+
+func TestBase(t *testing.T) {
+	l := New(os.Stdout)
+	l.SetCaller(true)
+	l.SetLevel(LDEBUG)
+	l.Debug("Debug")
+	l.Debugf("%s", "Debugf")
+	l.Info("Info")
+	l.Infof("%s", "Infof")
+	l.Warn("Warn")
+	l.Warnf("%s", "Warnf")
+	l.Error("Error")
+	l.Errorf("%s", "Errorf")
+}
+
+func TestWithBase(t *testing.T) {
+	l := New(os.Stdout)
+	l.SetCaller(true)
+	ctx := TraceCtx(context.TODO())
+	l.Ctx(ctx).Debug("Debug")
+	l.Ctx(ctx).Debugf("%s", "Debugf")
+	l.Ctx(ctx).Info("Info")
+	l.Ctx(ctx).Infof("%s", "Infof")
+	l.Ctx(ctx).Warn("Warn")
+	l.Ctx(ctx).Warnf("%s", "Warnf")
+	l.Ctx(ctx).Error("Error")
+	l.Ctx(ctx).Errorf("%s", "Errorf")
+}
+func TestConfig(t *testing.T) {
+	l := New(nil)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	l.SetMaxAge(1)
+	l.SetSep("/")
+	l.SetSkip(2)
+	l.SetMaxSize(1024)
+	ctx := TraceCtx(context.TODO())
+	l.Ctx(ctx).Debug("Debug")
+	l.Ctx(ctx).Debugf("%s", "Debugf")
+	l.Ctx(ctx).Info("Info")
+	l.Ctx(ctx).Infof("%s", "Infof")
+	l.Ctx(ctx).Warn("Warn")
+	l.Ctx(ctx).Warnf("%s", "Warnf")
+	l.Ctx(ctx).Error("Error")
+	l.Ctx(ctx).Errorf("%s", "Errorf")
+}
+
+func TestConfigWithFile(t *testing.T) {
+	l := New(os.Stdout)
+	l.SetFile("./logs/app.log")
+	l.SetCaller(true)
+	l.SetLevel(LERROR)
+	l.SetCons(true)
+	l.SetMaxAge(1)
+	l.SetMaxSize(1024)
+	ctx := TraceCtx(context.TODO())
+	l.Ctx(ctx).Debug("Debug")
+	l.Ctx(ctx).Debugf("%s", "Debugf")
+	l.Ctx(ctx).Info("Info")
+	l.Ctx(ctx).Infof("%s", "Infof")
+	l.Ctx(ctx).Warn("Warn")
+	l.Ctx(ctx).Warnf("%s", "Warnf")
+	l.Ctx(ctx).Error("Error")
+	l.Ctx(ctx).Errorf("%s", "Errorf")
+}
 
 // ---------------------------------------------------------------------------------------------------Parallel
 type blackholeStream struct {
@@ -41,6 +129,7 @@ func BenchmarkParallel(b *testing.B) {
 				Int64("int64", 64).
 				Uint("uint", 6).
 				Uint8("uin8", 8).
+				Err(nil).
 				Float32("float32", 3.14).Info()
 		}
 	})
@@ -73,26 +162,18 @@ func BenchmarkParallelFile(b *testing.B) {
 		}
 	})
 }
-func TestLogger(t *testing.T) {
-	log.SetCaller(true)
-	Debug()
-	Debug("debug")
-	Debugf("debugf")
-	Info()
-	Info("info")
-	Infof("infof")
-	Warn()
-	Warn("warn")
-	Warnf("warnf")
-	Error()
-	Error("erro")
-	Errorf("errorf")
+
+type mint int
+
+func (mi mint) String() string {
+	return fmt.Sprintf("int:%d", mi)
 }
 
 func TestField(t *testing.T) {
 	n := New(os.Stdout)
 	f := n.With()
 	f.Bool("out", false).
+		Caller(true).
 		Bool("key", true).
 		Int("key", 1).
 		Int8("key", 2).
@@ -107,8 +188,13 @@ func TestField(t *testing.T) {
 		Float32("key", 11.98122).
 		Float64("key", 12.987654321).
 		Str("key", "a").
+		Err(nil).
+		Err(errors.New("err")).
+		Raw("key", []byte("")).
 		Bytes("key", []byte("b")).
 		Time("key", time.Time{}).
+		Stringer("key", mint(10)).
+		Stringer("key", nil).
 		Dur("key", 0).Any("key-any", runtime.BlockProfileRecord{})
 	f.Info()
 }
@@ -127,6 +213,7 @@ func TestLog(t *testing.T) {
 	s.Info("666")
 	s.Info("xx")
 }
+
 func TestLog1(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetCaller(true)

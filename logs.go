@@ -20,6 +20,7 @@ const (
 	LINFO
 	LWARN
 	LERROR
+	LNONE
 	logShort = "DBGINFWRNERR" //DBG INF WRN ERR
 )
 const (
@@ -109,8 +110,8 @@ func (l *Logger) Close() error {
 
 // 设置输出等级
 func (l *Logger) SetLevel(lv logLevel) {
-	if lv < LDEBUG || lv > LERROR {
-		panic("logs: illegal log level")
+	if lv < LDEBUG || lv > LNONE {
+		panic("illegal log level")
 	}
 	l.mu.Lock()
 	l.level = lv
