@@ -15,7 +15,6 @@ import (
 func TestInst(t *testing.T) {
 	SetCaller(true)
 	SetLevel(LDEBUG)
-	SetJSON()
 	SetSep("/")
 	SetSkip(1)
 	SetOutput(io.Discard)
@@ -113,7 +112,6 @@ func (s *blackholeStream) Write(p []byte) (int, error) {
 func BenchmarkParallel(b *testing.B) {
 	stream := &blackholeStream{}
 	logger := New(stream)
-	logger.SetText()
 	// logger.SetCaller(true)
 	// logger.caller = true
 	b.ResetTimer()
@@ -232,7 +230,6 @@ func TestLog1(t *testing.T) {
 func TestWriter(t *testing.T) {
 	SetFile("./logs/app.log")
 	// SetText()
-	SetText()
 	SetCons(true)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {

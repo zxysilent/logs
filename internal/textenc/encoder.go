@@ -1,4 +1,4 @@
-package json
+package textenc
 
 import (
 	"encoding/json"
@@ -9,33 +9,37 @@ import (
 
 type Encoder struct{}
 
+func NewEncoder() *Encoder {
+	return &Encoder{}
+}
+
 // PutKey appends a new key to the output JSON.
 func (e Encoder) PutKey(dst []byte, key string) []byte {
-	if len(dst) > 0 && dst[len(dst)-1] != '{' {
-		dst = append(dst, ',')
+	if len(dst) > 0 {
+		dst = append(dst, ' ')
 	}
-	return append(e.PutString(dst, key), ':')
+	return append(e.quoteString(dst, key, true), '=')
 }
 
 // PutNil inserts a 'Nil' object into the dst byte array.
 func (Encoder) PutNil(dst []byte) []byte {
-	return append(dst, "null"...)
+	return append(dst, "nil"...)
 }
 
 // PutBegin inserts a map start into the dst byte array.
 func (Encoder) PutBegin(dst []byte) []byte {
-	return append(dst, '{')
+	return dst
 }
 
 // PutEnd inserts a map end into the dst byte array.
 func (Encoder) PutEnd(dst []byte) []byte {
-	return append(dst, '}')
+	return dst
 }
 
 // PutDelim adds markers to indicate end of a particular element.
 func (Encoder) PutDelim(dst []byte) []byte {
 	if len(dst) > 0 {
-		return append(dst, ',')
+		return append(dst, ' ')
 	}
 	return dst
 }
@@ -147,3 +151,5 @@ func (e Encoder) PutAny(dst []byte, i any) []byte {
 	}
 	return append(dst, marshaled...)
 }
+
+// Thank for github.com/rs/zerolog

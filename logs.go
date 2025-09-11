@@ -6,10 +6,8 @@ import (
 	"sync"
 
 	"github.com/zxysilent/logs/internal/buffer"
-	"github.com/zxysilent/logs/internal/encoder"
-	"github.com/zxysilent/logs/internal/encoder/json"
-	"github.com/zxysilent/logs/internal/encoder/text"
 	"github.com/zxysilent/logs/internal/file"
+	"github.com/zxysilent/logs/internal/textenc"
 )
 
 // 日志等级
@@ -30,7 +28,6 @@ const (
 	msgFieldName    = "msg"
 	errorFieldName  = "error"
 	callerFieldName = "caller"
-	timeFieldFormat = "2006/01/02 15:04:05.000"
 )
 
 // 字符串等级
@@ -39,13 +36,13 @@ func (lv logLevel) String() string {
 }
 
 type Logger struct {
-	out    io.Writer       // 输出
-	sep    string          // 路径分隔
-	caller bool            // 调用信息
-	level  logLevel        // 日志等级
-	skip   int             //
-	enc    encoder.Encoder //
-	mu     sync.Mutex      // logger🔒
+	out    io.Writer        // 输出
+	sep    string           // 路径分隔
+	caller bool             // 调用信息
+	level  logLevel         // 日志等级
+	skip   int              //
+	enc    *textenc.Encoder //
+	mu     sync.Mutex       // logger🔒
 	fw     *file.Writer
 }
 
@@ -59,8 +56,8 @@ func New(out io.Writer) *Logger {
 		level:  LINFO,
 		skip:   0,
 		sep:    "/",
+		enc:    textenc.NewEncoder(),
 	}
-	n.enc = &text.Encoder{}
 	return n
 }
 
@@ -123,14 +120,6 @@ func (l *Logger) SetCaller(b bool) {
 	l.mu.Lock()
 	l.caller = b
 	l.mu.Unlock()
-}
-
-func (l *Logger) SetJSON() {
-	l.enc = &json.Encoder{}
-}
-
-func (l *Logger) SetText() {
-	l.enc = &text.Encoder{}
 }
 
 func (l *Logger) SetSep(sep string) {

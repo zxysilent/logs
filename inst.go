@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-var log = New(os.Stdout)
+var log = New(os.Stderr)
 
 func SetLevel(lv logLevel) {
 	log.SetLevel(lv)
@@ -26,14 +26,6 @@ func SetSkip(skip int) {
 
 func SetOutput(out io.Writer) {
 	log.SetOutput(out)
-}
-
-func SetJSON() {
-	log.SetJSON()
-}
-
-func SetText() {
-	log.SetText()
 }
 
 func Debug(args ...any) {

@@ -1,4 +1,4 @@
-package json
+package textenc
 
 import (
 	"testing"
@@ -68,7 +68,7 @@ func TestPutString(t *testing.T) {
 	for _, tt := range encodeStringTests {
 		b := enc.PutString([]byte{}, tt.in)
 		if got, want := string(b), tt.out; got != want {
-			t.Errorf("appendString(%q) = %#q, want %#q", tt.in, got, want)
+			t.Errorf("putString(%q) = %#q, want %#q", tt.in, got, want)
 		}
 	}
 }

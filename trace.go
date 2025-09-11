@@ -15,7 +15,7 @@ const (
 
 func trace() string {
 	buf := make([]byte, traceSize)
-	for idx, cache := 0, fastRand(); idx < traceSize; {
+	for idx, cache := 0, fastrand(); idx < traceSize; {
 		buf[idx] = traceStr[cache&traceMask]
 		cache >>= 5
 		idx++
@@ -32,8 +32,8 @@ func TraceOf(ctx context.Context) string {
 	return traceId
 }
 
-//go:linkname fastRand runtime.fastrand64
-func fastRand() uint64
+//go:linkname fastrand runtime.fastrand64
+func fastrand() uint64
 
 const traceKey = "zlogs-trace-key"
 

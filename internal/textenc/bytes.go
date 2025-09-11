@@ -1,4 +1,4 @@
-package text
+package textenc
 
 import "unicode/utf8"
 

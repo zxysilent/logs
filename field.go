@@ -2,14 +2,14 @@ package logs
 
 import (
 	"github.com/zxysilent/logs/internal/buffer"
-	"github.com/zxysilent/logs/internal/encoder"
+	"github.com/zxysilent/logs/internal/textenc"
 )
 
 type FieldLogger struct {
 	attr   *buffer.Buffer //调用输出后清空
 	buf    *buffer.Buffer //每次输出的时候重置
 	logger *Logger
-	enc    encoder.Encoder
+	enc    *textenc.Encoder
 	trace  string
 	caller bool
 }

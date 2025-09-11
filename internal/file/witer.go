@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,7 @@ func New(path string) *Writer {
 		fpath: path, //dir1/dir2/app.log
 		mu:    sync.Mutex{},
 	}
+	log.Println()
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2
 	w.fsuffix = filepath.Ext(w.fpath)                               //.log
 	w.fname = strings.TrimSuffix(filepath.Base(w.fpath), w.fsuffix) //app
