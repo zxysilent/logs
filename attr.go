@@ -3,179 +3,181 @@ package logs
 import (
 	"fmt"
 	"time"
+
+	"github.com/zxysilent/logs/internal/textenc"
 )
 
-func (s *FieldLogger) Str(key, val string) *FieldLogger {
+func (s *fieldLogger) Str(key, val string) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutString(s.enc.PutKey(*s.attr, key), val)
+	*s.attr = textenc.PutString(textenc.PutKey(*s.attr, key), val)
 	return s
 }
 
-func (s *FieldLogger) Stringer(key string, val fmt.Stringer) *FieldLogger {
+func (s *fieldLogger) Stringer(key string, val fmt.Stringer) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
 	if val != nil {
-		*s.attr = s.enc.PutString(s.enc.PutKey(*s.attr, key), val.String())
+		*s.attr = textenc.PutString(textenc.PutKey(*s.attr, key), val.String())
 		return s
 	}
 
-	*s.attr = s.enc.PutAny(s.enc.PutKey(*s.attr, key), nil)
+	*s.attr = textenc.PutAny(textenc.PutKey(*s.attr, key), nil)
 	return s
 }
 
-func (s *FieldLogger) Bytes(key string, val []byte) *FieldLogger {
+func (s *fieldLogger) Bytes(key string, val []byte) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutBytes(s.enc.PutKey(*s.attr, key), val)
+	*s.attr = textenc.PutBytes(textenc.PutKey(*s.attr, key), val)
 	return s
 }
 
-func (s *FieldLogger) Err(err error) *FieldLogger {
+func (s *fieldLogger) Err(err error) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
 	if err == nil {
-		*s.attr = s.enc.PutNil(s.enc.PutKey(*s.attr, errorFieldName))
+		*s.attr = textenc.PutNil(textenc.PutKey(*s.attr, errorFieldName))
 	} else {
-		*s.attr = s.enc.PutString(s.enc.PutKey(*s.attr, errorFieldName), err.Error())
+		*s.attr = textenc.PutString(textenc.PutKey(*s.attr, errorFieldName), err.Error())
 	}
 	return s
 }
 
-func (s *FieldLogger) Bool(key string, b bool) *FieldLogger {
+func (s *fieldLogger) Bool(key string, b bool) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutBool(s.enc.PutKey(*s.attr, key), b)
+	*s.attr = textenc.PutBool(textenc.PutKey(*s.attr, key), b)
 	return s
 }
 
-func (s *FieldLogger) Int(key string, i int) *FieldLogger {
+func (s *fieldLogger) Int(key string, i int) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutInt(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutInt(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Int8(key string, i int8) *FieldLogger {
+func (s *fieldLogger) Int8(key string, i int8) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutInt8(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutInt8(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Int16(key string, i int16) *FieldLogger {
+func (s *fieldLogger) Int16(key string, i int16) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutInt16(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutInt16(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Int32(key string, i int32) *FieldLogger {
+func (s *fieldLogger) Int32(key string, i int32) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutInt32(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutInt32(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Int64(key string, i int64) *FieldLogger {
+func (s *fieldLogger) Int64(key string, i int64) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutInt64(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutInt64(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Uint(key string, i uint) *FieldLogger {
+func (s *fieldLogger) Uint(key string, i uint) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutUint(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutUint(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Uint8(key string, i uint8) *FieldLogger {
+func (s *fieldLogger) Uint8(key string, i uint8) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutUint8(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutUint8(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Uint16(key string, i uint16) *FieldLogger {
+func (s *fieldLogger) Uint16(key string, i uint16) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutUint16(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutUint16(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Uint32(key string, i uint32) *FieldLogger {
-	*s.attr = s.enc.PutUint32(s.enc.PutKey(*s.attr, key), i)
+func (s *fieldLogger) Uint32(key string, i uint32) *fieldLogger {
+	*s.attr = textenc.PutUint32(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Uint64(key string, i uint64) *FieldLogger {
+func (s *fieldLogger) Uint64(key string, i uint64) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutUint64(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutUint64(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Float32(key string, f float32) *FieldLogger {
+func (s *fieldLogger) Float32(key string, f float32) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutFloat32(s.enc.PutKey(*s.attr, key), f)
+	*s.attr = textenc.PutFloat32(textenc.PutKey(*s.attr, key), f)
 	return s
 }
 
-func (s *FieldLogger) Float64(key string, f float64) *FieldLogger {
+func (s *fieldLogger) Float64(key string, f float64) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutFloat64(s.enc.PutKey(*s.attr, key), f)
+	*s.attr = textenc.PutFloat64(textenc.PutKey(*s.attr, key), f)
 	return s
 }
 
-func (s *FieldLogger) Time(key string, t time.Time) *FieldLogger {
+func (s *fieldLogger) Time(key string, t time.Time) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutTime(s.enc.PutKey(*s.attr, key), t)
-	// *s.attr = s.enc.PutTime(s.enc.PutKey(*s.attr, key), t, timeFieldFormat)
+	*s.attr = textenc.PutTime(textenc.PutKey(*s.attr, key), t)
+	// *s.attr = textenc.PutTime(textenc.PutKey(*s.attr, key), t, timeFieldFormat)
 	return s
 }
 
-func (s *FieldLogger) Dur(key string, d time.Duration) *FieldLogger {
+func (s *fieldLogger) Dur(key string, d time.Duration) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutDuration(s.enc.PutKey(*s.attr, key), d)
+	*s.attr = textenc.PutDuration(textenc.PutKey(*s.attr, key), d)
 	return s
 }
 
-func (s *FieldLogger) Any(key string, i any) *FieldLogger {
+func (s *fieldLogger) Any(key string, i any) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = s.enc.PutAny(s.enc.PutKey(*s.attr, key), i)
+	*s.attr = textenc.PutAny(textenc.PutKey(*s.attr, key), i)
 	return s
 }
 
-func (s *FieldLogger) Raw(key string, b []byte) *FieldLogger {
+func (s *fieldLogger) Raw(key string, b []byte) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = append(s.enc.PutKey(*s.attr, key), b...)
+	*s.attr = append(textenc.PutKey(*s.attr, key), b...)
 	return s
 }

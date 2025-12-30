@@ -1,20 +1,22 @@
 ## 简单 golang 结构化日志记录库
->旧版本请使用 `github.com/zxysilent/logs v0.2.1`
-- 日志等级 ```DEBUG、INFO、WARN、ERROR```
-- 每天切分日志文件
-- 默认保留```31```天日志记录(可修改)
-- 可同时输出到文件和标准输出
-- 单文件大小限制 ```64MB```(可修改)
-- 可配置输出等级
-- 可配置调用信息
-- 可链路追踪
-- 适配xorm日志
-- 直接使用、维护默认实例
-- 可新建日志实例 ```New(io.Writer)```
 
+> 旧版本请使用 `github.com/zxysilent/logs v0.2.1`
+
+-   日志等级 `DEBUG、INFO、WARN、ERROR`
+-   每天切分日志文件
+-   默认保留`31`天日志记录(可修改)
+-   可同时输出到文件和标准输出
+-   单文件大小限制 `64MB`(可修改)
+-   可配置输出等级
+-   可配置调用信息
+-   可链路追踪
+-   适配 xorm 日志
+-   直接使用、维护默认实例
+-   可新建日志实例 `New(io.Writer)`
 
 ### 日志结构
-``` golang
+
+```golang
 // logger
 type Logger struct {
 	out    io.Writer  // 输出
@@ -28,7 +30,8 @@ type Logger struct {
 ```
 
 ### 使用示例
-``` golang
+
+```golang
 package main
 
 import "github.com/zxysilent/logs"
@@ -63,6 +66,11 @@ func main() {
 				Uint("uint", 6).
 				Uint8("uin8", 8).
 				Float32("float32", 3.14).Info()
+     // 复用结构字段
+    d:= logger.With().Str("str", "str")
+    defer d.Omit()
+    d.Dup().Info()
+    d.Dup().Warn()
     // 链路追踪
     ctx := TraceCtx(context.Background())
 	logger.Ctx(ctx).Str("basic", "basic").Debug()
@@ -94,7 +102,33 @@ func main() {
 
 ```
 
- ### 性能 
+### xorm用例
+
+```golang
+db.AddHook(&repoHook{showSql: true})
+
+type repoHook struct {
+	showSql bool
+}
+
+func (rh *repoHook) BeforeProcess(ctx *contexts.ContextHook) (context.Context, error) {
+	return ctx.Ctx, nil
+}
+
+func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
+	if ctx.Err != nil {
+		logs.Ctx(ctx.Ctx).Caller(false).Err(ctx.Err).Str("SQL", ctx.SQL).Any("args", ctx.Args).Dur("dur", ctx.ExecuteTime).Error()
+	} else if ctx.ExecuteTime > 200*time.Millisecond {
+		logs.Ctx(ctx.Ctx).Caller(false).Str("SlowSQL", ctx.SQL).Any("args", ctx.Args).Dur("dur", ctx.ExecuteTime).Warn()
+	} else if rh.showSql {
+		logs.Ctx(ctx.Ctx).Caller(false).Str("SQL", ctx.SQL).Any("args", ctx.Args).Dur("dur", ctx.ExecuteTime).Debug()
+	}
+	return ctx.Err
+}
+
+```
+
+### 性能
 
 ```
 pkg: github.com/zxysilent/logs
@@ -105,3 +139,7 @@ BenchmarkParallel-16
 PASS
 ok  	github.com/zxysilent/logs	1.236s
 ```
+
+## Take ideas from
+
+[zerolog](https://github.com/rs/zerolog/)

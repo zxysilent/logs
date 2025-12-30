@@ -25,11 +25,11 @@ func init() {
 // entirety to the byte slice.
 // If we encounter a byte that does need encoding, switch up
 // the operation and perform a byte-by-byte read-encode-append.
-func (enc Encoder) PutString(dst []byte, s string) []byte {
-	return enc.quoteString(dst, s, true)
+func PutString(dst []byte, s string) []byte {
+	return quoteString(dst, s, true)
 }
 
-func (Encoder) quoteString(dst []byte, s string, quote bool) []byte {
+func quoteString(dst []byte, s string, quote bool) []byte {
 	quote = quote && strings.ContainsAny(s, "	 ")
 	if quote {
 		dst = append(dst, '"')
@@ -62,11 +62,11 @@ func (Encoder) quoteString(dst []byte, s string, quote bool) []byte {
 
 // PutStringer encodes the input Stringer to json and appends the
 // encoded Stringer value to the input byte slice.
-func (e Encoder) PutStringer(dst []byte, val fmt.Stringer) []byte {
+func PutStringer(dst []byte, val fmt.Stringer) []byte {
 	if val == nil {
-		return e.PutAny(dst, nil)
+		return PutNil(dst)
 	}
-	return e.PutString(dst, val.String())
+	return PutString(dst, val.String())
 }
 
 // // appendStringComplex is used by appendString to take over an in

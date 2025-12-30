@@ -6,7 +6,7 @@ import (
 
 // PutTime formats the input time with the given format
 // and appends the encoded string to the input byte slice.
-func (e Encoder) PutTime(dst []byte, t time.Time) []byte {
+func PutTime(dst []byte, t time.Time) []byte {
 	// Format date.
 	year, month, day := t.Date()
 	dst = appendInt(dst, year, 4)
@@ -33,8 +33,8 @@ func (e Encoder) PutTime(dst []byte, t time.Time) []byte {
 
 // PutDuration formats the input duration with the given unit & format
 // and appends the encoded string to the input byte slice.
-func (e Encoder) PutDuration(dst []byte, d time.Duration) []byte {
-	return e.PutString(dst, d.String())
+func PutDuration(dst []byte, d time.Duration) []byte {
+	return PutString(dst, d.String())
 }
 
 // appendInt appends the decimal form of x to b and returns the result.

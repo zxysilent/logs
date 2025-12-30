@@ -219,9 +219,9 @@ func TestLog1(t *testing.T) {
 	defer l.Close()
 	ctx := TraceCtx(context.Background(), trace())
 	l1 := l.Ctx(ctx).Str("basic", "basic")
-	l1.Debug()
-	l1.Info()
-	l1.Error()
+	l1.Dup().Debug()
+	l1.Dup().Info()
+	l1.Dup().Error()
 	s := l.Ctx(ctx)
 	s.Bool("b", false)
 	s.Info("666")
@@ -248,6 +248,29 @@ func TestWriter(t *testing.T) {
 	}
 	With().Str("idx", "sp ce").Errorf("omit empty")
 	Close()
+}
+func TestSpan(t *testing.T) {
+	SetFile("./logs/app.log")
+	SetCons(true)
+	SetCaller(true)
+	ctx := TraceCtx(context.Background())
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
+	defer n.Omit()
+	n.Dup().Str("b", "b").Info("xx")
+	n.Dup().Str("c", "c").Info("xx")
+}
+
+func BenchmarkParallelSpan(b *testing.B) {
+	ctx := TraceCtx(context.Background())
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
+	defer n.Omit()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			n.Dup().Str("b", "b").Info("xx")
+			n.Dup().Str("c", "c").Info("xx")
+		}
+	})
 }
 
 // # 使用benchmark采集3秒的内存维度的数据，并生成文件

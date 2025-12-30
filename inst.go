@@ -76,11 +76,11 @@ func Errorf(foramt string, args ...any) {
 	}
 }
 
-func With() *FieldLogger {
+func With() *fieldLogger {
 	return log.With()
 }
 
-func Ctx(ctx context.Context) *FieldLogger {
+func Ctx(ctx context.Context) *fieldLogger {
 	return log.Ctx(ctx)
 }
 

@@ -3,7 +3,7 @@ package textenc
 import "unicode/utf8"
 
 // PutBytes is a mirror of appendString with []byte arg
-func (Encoder) PutBytes(dst, s []byte) []byte {
+func PutBytes(dst, s []byte) []byte {
 	for i := 0; i < len(s); i++ {
 		if !noEscapeTable[s[i]] {
 			return appendBytesComplex(dst, s, i)

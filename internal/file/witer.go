@@ -32,8 +32,8 @@ type Writer struct {
 	cons    bool      // 标准输出  默认 false
 	file    *os.File
 	bw      *bufio.Writer
-	mu      sync.Mutex
 	tk      *time.Ticker
+	mu      sync.Mutex
 }
 
 func New(path string) *Writer {
