@@ -48,6 +48,23 @@ func (s *fieldLogger) Err(err error) *fieldLogger {
 	return s
 }
 
+func (s *fieldLogger) IfErr(err error) *fieldLogger {
+	if err == nil {
+		s.skip = true
+		return s
+	}
+	if s.attr == nil {
+		return s
+	}
+	*s.attr = textenc.PutString(textenc.PutKey(*s.attr, errorFieldName), err.Error())
+	return s
+}
+
+func (s *fieldLogger) If(b bool) *fieldLogger {
+	s.skip = !b
+	return s
+}
+
 func (s *fieldLogger) Bool(key string, b bool) *fieldLogger {
 	if s.attr == nil {
 		return s

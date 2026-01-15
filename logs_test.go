@@ -57,6 +57,8 @@ func TestWithBase(t *testing.T) {
 	l.Ctx(ctx).Warnf("%s", "Warnf")
 	l.Ctx(ctx).Error("Error")
 	l.Ctx(ctx).Errorf("%s", "Errorf")
+	l.Ctx(ctx).If(false).Error("Error")
+	l.Ctx(ctx).If(false).Errorf("%s", "Errorf")
 }
 func TestConfig(t *testing.T) {
 	l := New(nil)
@@ -255,15 +257,16 @@ func TestSpan(t *testing.T) {
 	SetCaller(true)
 	ctx := TraceCtx(context.Background())
 	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
-	defer n.Omit()
+	defer n.Rel()
 	n.Dup().Str("b", "b").Info("xx")
 	n.Dup().Str("c", "c").Info("xx")
 }
 
 func BenchmarkParallelSpan(b *testing.B) {
 	ctx := TraceCtx(context.Background())
+	// SetOutput(io.Discard)
 	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
-	defer n.Omit()
+	defer n.Rel()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
