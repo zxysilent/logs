@@ -37,16 +37,30 @@ func fastrand() uint64
 
 const traceKey = "zlogs-trace-key"
 
-func TraceCtx(ctx context.Context, tarceid ...string) context.Context {
-	val := ctx.Value(traceKey)
-	if val == nil {
-		var id = ""
-		if len(tarceid) == 0 {
-			id = trace()
-		} else {
-			id = tarceid[0]
-		}
-		ctx = context.WithValue(ctx, traceKey, id)
+// TraceCtx 处理traceid并返回新的context
+// 1. ctx存在traceid，traceid参数不存在/为空 → 复用原有traceid
+// 2. ctx不存在traceid → 使用新值（传入的traceid或生成新的）
+// 3. ctx存在traceid且traceid参数存在 → 追加（原有值.新traceid）
+func TraceCtx(ctx context.Context, traceid ...string) context.Context {
+	ntraceid := ""
+	if len(traceid) > 0 {
+		ntraceid = traceid[0]
 	}
-	return ctx
+
+	otraceid, _ := ctx.Value(traceKey).(string)
+
+	ftraceid := ""
+	if otraceid == "" {
+		if ntraceid == "" {
+			ntraceid = trace()
+		}
+		ftraceid = ntraceid
+	} else {
+		if ntraceid == "" {
+			ftraceid = otraceid
+		} else {
+			ftraceid = otraceid + "." + ntraceid
+		}
+	}
+	return context.WithValue(ctx, traceKey, ftraceid)
 }
