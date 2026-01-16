@@ -2,7 +2,7 @@ package logs
 
 type fieldLogger struct {
 	attr   *buffer //调用输出后清空
-	logger *logger
+	logger *Logger
 	trace  string
 	caller bool
 	skip   bool

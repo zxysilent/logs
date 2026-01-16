@@ -11,7 +11,7 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
-func header(trace string, caller bool, log *logger, buf *buffer, lv logLevel) {
+func header(trace string, caller bool, log *Logger, buf *buffer, lv logLevel) {
 	*buf = textenc.PutBegin(*buf)
 	*buf = textenc.PutTime(textenc.PutKey(*buf, timeFieldName), time.Now())
 	*buf = textenc.PutString(textenc.PutKey(*buf, levelFieldName), lv.String())
@@ -33,7 +33,7 @@ func header(trace string, caller bool, log *logger, buf *buffer, lv logLevel) {
 	}
 }
 
-func print(trace string, lv logLevel, caller bool, log *logger, attr *buffer, args ...any) {
+func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
 	buf := getb()
 	defer putb(buf)
 	header(trace, caller, log, buf, lv)
@@ -49,7 +49,7 @@ func print(trace string, lv logLevel, caller bool, log *logger, attr *buffer, ar
 	log.Write(*buf)
 }
 
-func printf(trace string, lv logLevel, caller bool, log *logger, attr *buffer, format string, args ...any) {
+func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, format string, args ...any) {
 	buf := getb()
 	defer putb(buf)
 	header(trace, caller, log, buf, lv)
