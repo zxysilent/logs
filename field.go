@@ -12,6 +12,7 @@ type fieldLogger struct {
 func (s *fieldLogger) Dup() *fieldLogger {
 	f := getfl()
 	f.logger = s.logger
+	f.trace = s.trace
 	f.caller = s.caller
 	f.attr = getb()
 	*f.attr = append(*f.attr, *s.attr...)

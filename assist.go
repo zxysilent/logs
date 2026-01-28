@@ -132,5 +132,7 @@ func putfl(fl *fieldLogger) {
 	putb(fl.attr)
 	fl.attr = nil
 	fl.trace = ""
+	fl.caller = false
+	fl.skip = false
 	fpool.Put(fl)
 }
