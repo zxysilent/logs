@@ -33,7 +33,7 @@ func (lv logLevel) String() string {
 	return logShort[lv*3 : lv*3+3]
 }
 
-type logger struct {
+type Logger struct {
 	out    io.Writer  // 输出
 	sep    string     // 路径分隔
 	caller bool       // 调用信息
@@ -43,11 +43,11 @@ type logger struct {
 	fw     *file.Writer
 }
 
-func New(out io.Writer) *logger {
+func New(out io.Writer) *Logger {
 	if out == nil {
 		out = io.Discard
 	}
-	n := &logger{
+	n := &Logger{
 		out:    out,
 		caller: false,
 		level:  LINFO,
@@ -57,13 +57,13 @@ func New(out io.Writer) *logger {
 	return n
 }
 
-func (l *logger) SetFile(path string) {
+func (l *Logger) SetFile(path string) {
 	l.fw = file.New(path)
 	l.SetOutput(l.fw)
 }
 
 // SetMaxAge 最大保留天数
-func (l *logger) SetMaxAge(ma int) {
+func (l *Logger) SetMaxAge(ma int) {
 	if l.fw == nil {
 		return
 	}
@@ -73,7 +73,7 @@ func (l *logger) SetMaxAge(ma int) {
 }
 
 // SetMaxSize 单个日志最大容量
-func (l *logger) SetMaxSize(ms int64) {
+func (l *Logger) SetMaxSize(ms int64) {
 	if l.fw == nil {
 		return
 	}
@@ -83,7 +83,7 @@ func (l *logger) SetMaxSize(ms int64) {
 }
 
 // SetCons 同时输出控制台
-func (l *logger) SetCons(b bool) {
+func (l *Logger) SetCons(b bool) {
 	if l.fw == nil {
 		return
 	}
@@ -92,7 +92,7 @@ func (l *logger) SetCons(b bool) {
 	l.fw.SetCons(b)
 }
 
-func (l *logger) Close() error {
+func (l *Logger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.fw != nil {
@@ -102,7 +102,7 @@ func (l *logger) Close() error {
 }
 
 // 设置输出等级
-func (l *logger) SetLevel(lv logLevel) {
+func (l *Logger) SetLevel(lv logLevel) {
 	if lv < LDEBUG || lv > LNONE {
 		panic("illegal log level")
 	}
@@ -112,34 +112,34 @@ func (l *logger) SetLevel(lv logLevel) {
 }
 
 // 设置调用信息
-func (l *logger) SetCaller(b bool) {
+func (l *Logger) SetCaller(b bool) {
 	l.mu.Lock()
 	l.caller = b
 	l.mu.Unlock()
 }
 
-func (l *logger) SetSep(sep string) {
+func (l *Logger) SetSep(sep string) {
 	l.mu.Lock()
 	l.sep = sep
 	l.mu.Unlock()
 }
 
-func (l *logger) SetSkip(skip int) {
+func (l *Logger) SetSkip(skip int) {
 	l.mu.Lock()
 	l.skip = skip
 	l.mu.Unlock()
 }
 
-func (l *logger) SetOutput(out io.Writer) {
+func (l *Logger) SetOutput(out io.Writer) {
 	l.mu.Lock()
 	l.out = out
 	l.mu.Unlock()
 }
-func (l *logger) Write(p []byte) (int, error) {
+func (l *Logger) Write(p []byte) (int, error) {
 	return l.out.Write(p)
 }
 
-func (l *logger) With() *fieldLogger {
+func (l *Logger) With() *fieldLogger {
 	f := getfl()
 	f.logger = l
 	f.caller = l.caller
@@ -148,7 +148,7 @@ func (l *logger) With() *fieldLogger {
 }
 
 // tracing
-func (l *logger) Ctx(ctx context.Context) *fieldLogger {
+func (l *Logger) Ctx(ctx context.Context) *fieldLogger {
 	f := getfl()
 	f.trace, _ = ctx.Value(traceKey).(string)
 	f.logger = l
@@ -157,52 +157,52 @@ func (l *logger) Ctx(ctx context.Context) *fieldLogger {
 	return f
 }
 
-func (l *logger) Debug(args ...any) {
+func (l *Logger) Debug(args ...any) {
 	if LDEBUG >= l.level {
 		print("", LDEBUG, l.caller, l, nil, args...)
 	}
 }
-func (l *logger) Debugf(foramt string, args ...any) {
+func (l *Logger) Debugf(foramt string, args ...any) {
 	if LDEBUG >= l.level {
 		printf("", LDEBUG, l.caller, l, nil, foramt, args...)
 	}
 }
 
-func (l *logger) Info(args ...any) {
+func (l *Logger) Info(args ...any) {
 	if LINFO >= l.level {
 		print("", LINFO, l.caller, l, nil, args...)
 	}
 }
 
-func (l *logger) Infof(foramt string, args ...any) {
+func (l *Logger) Infof(foramt string, args ...any) {
 	if LINFO >= l.level {
 		printf("", LINFO, l.caller, l, nil, foramt, args...)
 	}
 }
 
-func (l *logger) Warn(args ...any) {
+func (l *Logger) Warn(args ...any) {
 	if LWARN >= l.level {
 		print("", LWARN, l.caller, l, nil, args...)
 	}
 }
 
-func (l *logger) Warnf(foramt string, args ...any) {
+func (l *Logger) Warnf(foramt string, args ...any) {
 	if LWARN >= l.level {
 		printf("", LWARN, l.caller, l, nil, foramt, args...)
 	}
 }
-func (l *logger) Error(args ...any) {
+func (l *Logger) Error(args ...any) {
 	if LERROR >= l.level {
 		print("", LERROR, l.caller, l, nil, args...)
 	}
 }
 
-func (l *logger) Errorf(foramt string, args ...any) {
+func (l *Logger) Errorf(foramt string, args ...any) {
 	if LERROR >= l.level {
 		printf("", LERROR, l.caller, l, nil, foramt, args...)
 	}
 }
 
-func (l *logger) Writer() io.Writer {
+func (l *Logger) Writer() io.Writer {
 	return l
 }
