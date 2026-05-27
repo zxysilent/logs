@@ -13,7 +13,7 @@ import (
 
 const (
 	sizeMiB    = 1024 * 1024
-	defMaxAge  = 31
+	defMaxAge  = 64 //天
 	defMaxSize = 64 //MiB
 )
 

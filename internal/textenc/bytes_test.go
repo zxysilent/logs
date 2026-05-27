@@ -50,6 +50,32 @@ func TestPutBytes(t *testing.T) {
 // 	}
 // }
 
+func TestPutBytesQuote(t *testing.T) {
+	tests := []struct {
+		in  string
+		out string
+	}{
+		{"hello world", `"hello world"`},
+		{"a b", `"a b"`},
+		{"\thello", `"\thello"`},
+		{"hello\tworld", `"hello\tworld"`},
+		{"a b\tc", `"a b\tc"`},
+		{"hello", `hello`},
+		{"hello\nworld", `hello\nworld`},
+	}
+	for _, tt := range tests {
+		got := string(PutBytesQuote([]byte{}, []byte(tt.in)))
+		if got != tt.out {
+			t.Errorf("PutBytesQuote(%q) = %#q, want %#q", tt.in, got, tt.out)
+		}
+		//Verify PutStringQuote matching
+		strGot := string(PutStringQuote([]byte{}, tt.in))
+		if got != strGot {
+			t.Errorf("PutBytesQuote(%q)=%#q != PutStringQuote(%q)=%#q", tt.in, got, tt.in, strGot)
+		}
+	}
+}
+
 func BenchmarkPutBytes(b *testing.B) {
 	tests := map[string]string{
 		"NoEncoding":       `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,

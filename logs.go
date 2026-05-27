@@ -54,7 +54,7 @@ func New(out io.Writer) *Logger {
 		skip:   0,
 		sep:    "/",
 	}
-	n.HijackLog()
+	n.hijackstd()
 	return n
 }
 

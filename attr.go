@@ -11,7 +11,7 @@ func (s *fieldLogger) Str(key, val string) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = textenc.PutString(textenc.PutKey(*s.attr, key), val)
+	*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, key), val)
 	return s
 }
 
@@ -20,7 +20,7 @@ func (s *fieldLogger) Stringer(key string, val fmt.Stringer) *fieldLogger {
 		return s
 	}
 	if val != nil {
-		*s.attr = textenc.PutString(textenc.PutKey(*s.attr, key), val.String())
+		*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, key), val.String())
 		return s
 	}
 
@@ -32,7 +32,7 @@ func (s *fieldLogger) Bytes(key string, val []byte) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = textenc.PutBytes(textenc.PutKey(*s.attr, key), val)
+	*s.attr = textenc.PutBytesQuote(textenc.PutKey(*s.attr, key), val)
 	return s
 }
 
@@ -43,7 +43,7 @@ func (s *fieldLogger) Err(err error) *fieldLogger {
 	if err == nil {
 		*s.attr = textenc.PutNil(textenc.PutKey(*s.attr, errorFieldName))
 	} else {
-		*s.attr = textenc.PutString(textenc.PutKey(*s.attr, errorFieldName), err.Error())
+		*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, errorFieldName), err.Error())
 	}
 	return s
 }
@@ -56,7 +56,7 @@ func (s *fieldLogger) IfErr(err error) *fieldLogger {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = textenc.PutString(textenc.PutKey(*s.attr, errorFieldName), err.Error())
+	*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, errorFieldName), err.Error())
 	return s
 }
 

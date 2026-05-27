@@ -22,7 +22,7 @@ func TestHijackLog(t *testing.T) {
 	defer SetLevel(prevLevel)
 	defer SetOutput(prevOut)
 	defer SetCaller(prevCaller)
-	log.HijackLog()
+	log.hijackstd()
 	stdlog.Println("xxxxxxxxxxxxxxx")
 	if got := buf.String(); !strings.Contains(got, `msg=xxxxxxxxxxxxxxx`) {
 		t.Fatalf("hijack msg mismatch: %s", got)
@@ -164,7 +164,7 @@ func TestStdWriterDirectWrite(t *testing.T) {
 	l.SetLevel(LINFO)
 	l.SetCaller(false)
 
-	writer := l.StdWriter("ns-x")
+	writer := l.stdWriter("ns-x")
 	if _, err := writer.Write([]byte("ns-xpayload\n")); err != nil {
 		t.Fatalf("write error: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestStdWriterLevelFilter(t *testing.T) {
 	l.SetLevel(LERROR)
 	l.SetCaller(false)
 
-	writer := l.StdWriter("ns")
+	writer := l.stdWriter("ns")
 	if _, err := writer.Write([]byte("nspayload\n")); err != nil {
 		t.Fatalf("write error: %v", err)
 	}

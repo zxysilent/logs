@@ -16,21 +16,20 @@ func init() {
 	}
 }
 
-// PutString encodes the input string to json and appends
-// the encoded string to the input byte slice.
-//
-// The operation loops though each byte in the string looking
-// for characters that need json or utf8 encoding. If the string
-// does not need encoding, then the string is appended in its
-// entirety to the byte slice.
-// If we encounter a byte that does need encoding, switch up
-// the operation and perform a byte-by-byte read-encode-append.
+// PutString encodes the input string and appends
+// the encoded string to the input byte slice without quoting spaces/tabs.
 func PutString(dst []byte, s string) []byte {
+	return quoteString(dst, s, false)
+}
+
+// PutStringQuote encodes the input string and appends
+// the encoded string to the input byte slice, quoting if it contains spaces/tabs.
+func PutStringQuote(dst []byte, s string) []byte {
 	return quoteString(dst, s, true)
 }
 
 func quoteString(dst []byte, s string, quote bool) []byte {
-	quote = quote && strings.ContainsAny(s, "	 ")
+	quote = quote && strings.ContainsAny(s, "\t ")
 	if quote {
 		dst = append(dst, '"')
 	}
@@ -66,7 +65,7 @@ func PutStringer(dst []byte, val fmt.Stringer) []byte {
 	if val == nil {
 		return PutNil(dst)
 	}
-	return PutString(dst, val.String())
+	return PutStringQuote(dst, val.String())
 }
 
 // // appendStringComplex is used by appendString to take over an in

@@ -1,15 +1,39 @@
 package textenc
 
-import "unicode/utf8"
+import (
+	"bytes"
+	"unicode/utf8"
+)
 
-// PutBytes is a mirror of appendString with []byte arg
+// PutBytes encodes []byte without quoting spaces/tabs.
 func PutBytes(dst, s []byte) []byte {
+	return putBytes(dst, s, false)
+}
+
+// PutBytesQuote encodes []byte and quotes if it contains spaces/tabs.
+func PutBytesQuote(dst, s []byte) []byte {
+	return putBytes(dst, s, true)
+}
+
+func putBytes(dst, s []byte, quote bool) []byte {
+	quote = quote && bytes.ContainsAny(s, "\t ")
+	if quote {
+		dst = append(dst, '"')
+	}
 	for i := 0; i < len(s); i++ {
 		if !noEscapeTable[s[i]] {
-			return appendBytesComplex(dst, s, i)
+			dst = appendBytesComplex(dst, s, i)
+			if quote {
+				dst = append(dst, '"')
+			}
+			return dst
 		}
 	}
-	return append(dst, s...)
+	dst = append(dst, s...)
+	if quote {
+		dst = append(dst, '"')
+	}
+	return dst
 }
 
 // appendBytesComplex is a mirror of the appendStringComplex

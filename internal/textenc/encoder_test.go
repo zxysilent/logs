@@ -190,11 +190,29 @@ func FuzzPutString(f *testing.F) {
 	})
 }
 
+func FuzzPutStringQuote(f *testing.F) {
+	f.Add("hello")
+	f.Add("key with space")
+	f.Add("multibyte\u276d")
+	f.Fuzz(func(t *testing.T, s string) {
+		_ = PutStringQuote(nil, s)
+	})
+}
+
 func FuzzPutBytes(f *testing.F) {
 	f.Add([]byte("hello"))
 	f.Add([]byte{0, 1, 0x1f, 0x7f, 0xFF})
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_ = PutBytes(nil, data)
+	})
+}
+
+func FuzzPutBytesQuote(f *testing.F) {
+	f.Add([]byte("hello"))
+	f.Add([]byte("key with space"))
+	f.Add([]byte{0, 1, 0x1f, 0x7f, 0xFF})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_ = PutBytesQuote(nil, data)
 	})
 }
 

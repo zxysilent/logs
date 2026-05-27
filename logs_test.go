@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	stdlog "log"
 	"os"
 	"runtime"
 	"strconv"
@@ -940,7 +941,7 @@ func TestStdWriterLevelOff(t *testing.T) {
 	l.SetCaller(false)
 	l.SetLevel(LERROR)
 
-	w := l.StdWriter("t")
+	w := l.stdWriter("t")
 	n, err := w.Write([]byte("payload\n"))
 	if err != nil {
 		t.Fatalf("write error: %v", err)
@@ -1037,6 +1038,24 @@ func TestWriterSig(t *testing.T) {
 	var w io.Writer = l.Writer()
 	if w == nil {
 		t.Fatal("Writer() returned nil")
+	}
+}
+
+// TestHijackStdlibCaller verifies caller is correct when stdlib log is hijacked.
+func TestHijackStdlibCaller(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	// Hijack is already done in New(), so we can use stdlib log directly.
+	stdlog.Print("hijack-test")
+	got := buf.String()
+	if !strings.Contains(got, "caller=") {
+		t.Fatal("missing caller field")
+	}
+	// The caller should NOT be a stdlib file like log.go
+	if strings.Contains(got, "caller=/log.go:") || strings.Contains(got, "caller=/log/") {
+		t.Fatalf("caller points to stdlib log package: %s", got)
 	}
 }
 

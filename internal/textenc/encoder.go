@@ -151,7 +151,7 @@ func PutFloat64(dst []byte, val float64) []byte {
 func PutAny(dst []byte, i any) []byte {
 	marshaled, err := json.Marshal(i)
 	if err != nil {
-		return PutString(dst, fmt.Sprintf("marshaling error: %v", err))
+		return PutStringQuote(dst, fmt.Sprintf("marshaling error: %v", err))
 	}
 	return append(dst, marshaled...)
 }

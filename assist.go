@@ -13,7 +13,7 @@ import (
 
 const (
 	callerBaseSkip = 2
-	writeExtraSkip = 1
+	writeExtraSkip = 2
 )
 
 func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
@@ -47,9 +47,9 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 		key := textenc.PutKeyRaw(*buf, mesgFieldName)
 		switch v := args[0].(type) {
 		case string:
-			*buf = textenc.PutString(key, v)
+			*buf = textenc.PutStringQuote(key, v)
 		case []byte:
-			*buf = textenc.PutBytes(key, v)
+			*buf = textenc.PutBytesQuote(key, v)
 		case bool:
 			*buf = textenc.PutBool(key, v)
 		case int:
@@ -77,12 +77,12 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 		case float64:
 			*buf = textenc.PutFloat64(key, v)
 		case fmt.Stringer:
-			*buf = textenc.PutString(key, v.String())
+			*buf = textenc.PutStringQuote(key, v.String())
 		default:
-			*buf = textenc.PutString(key, fmt.Sprint(v))
+			*buf = textenc.PutStringQuote(key, fmt.Sprint(v))
 		}
 	} else if n > 1 {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprint(args...))
+		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprint(args...))
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
@@ -116,9 +116,9 @@ func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, f
 		*buf = append(*buf, *attr...)
 	}
 	if len(args) >= 1 {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprintf(format, args...))
+		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprintf(format, args...))
 	} else {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), format)
+		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), format)
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
@@ -152,7 +152,7 @@ func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, m
 		*buf = append(*buf, *attr...)
 	}
 	if len(msg) >= 1 {
-		*buf = textenc.PutBytes(textenc.PutKeyRaw(*buf, mesgFieldName), msg)
+		*buf = textenc.PutBytesQuote(textenc.PutKeyRaw(*buf, mesgFieldName), msg)
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)

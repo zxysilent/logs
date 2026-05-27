@@ -6,11 +6,11 @@ import (
 	stdlog "log"
 )
 
-func (l *Logger) HijackLog() {
+func (l *Logger) hijackstd() {
 	stdlog.SetFlags(0)
 	ns := stdlog.Prefix()
 	stdlog.SetPrefix("")
-	stdlog.SetOutput(l.StdWriter(ns))
+	stdlog.SetOutput(l.stdWriter(ns))
 }
 
 type stdWriter struct {
@@ -52,7 +52,7 @@ func (l *Logger) Printf(foramt string, args ...any) {
 	}
 }
 
-func (l *Logger) StdWriter(ns string) io.Writer {
+func (l *Logger) stdWriter(ns string) io.Writer {
 	return &stdWriter{logger: l, ns: ns}
 }
 
