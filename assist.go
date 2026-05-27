@@ -11,15 +11,22 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
-func header(trace string, caller bool, log *Logger, buf *buffer, lv logLevel) {
+const (
+	callerBaseSkip = 2
+	writeExtraSkip = 1
+)
+
+func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
+	buf := getb()
+	defer putb(buf)
 	*buf = textenc.PutBegin(*buf)
-	*buf = textenc.PutTime(textenc.PutKey(*buf, timeFieldName), time.Now())
-	*buf = textenc.PutString(textenc.PutKey(*buf, levelFieldName), lv.String())
+	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
+	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
 	if trace != "" {
-		*buf = textenc.PutString(textenc.PutKey(*buf, traceFieldName), trace)
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
 	}
 	if caller {
-		_, file, line, ok := runtime.Caller(log.skip + 3)
+		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip)
 		if !ok {
 			file = "###"
 			line = 0
@@ -29,20 +36,53 @@ func header(trace string, caller bool, log *Logger, buf *buffer, lv logLevel) {
 				file = file[slash:]
 			}
 		}
-		*buf = textenc.PutString(textenc.PutKey(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
 	}
-}
-
-func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
-	buf := getb()
-	defer putb(buf)
-	header(trace, caller, log, buf, lv)
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
 		*buf = append(*buf, *attr...)
 	}
-	if len(args) >= 1 {
-		*buf = textenc.PutString(textenc.PutKey(*buf, msgFieldName), fmt.Sprint(args...))
+	n := len(args)
+	if n == 1 {
+		key := textenc.PutKeyRaw(*buf, mesgFieldName)
+		switch v := args[0].(type) {
+		case string:
+			*buf = textenc.PutString(key, v)
+		case []byte:
+			*buf = textenc.PutBytes(key, v)
+		case bool:
+			*buf = textenc.PutBool(key, v)
+		case int:
+			*buf = textenc.PutInt(key, v)
+		case int8:
+			*buf = textenc.PutInt8(key, v)
+		case int16:
+			*buf = textenc.PutInt16(key, v)
+		case int32:
+			*buf = textenc.PutInt32(key, v)
+		case int64:
+			*buf = textenc.PutInt64(key, v)
+		case uint:
+			*buf = textenc.PutUint(key, v)
+		case uint8:
+			*buf = textenc.PutUint8(key, v)
+		case uint16:
+			*buf = textenc.PutUint16(key, v)
+		case uint32:
+			*buf = textenc.PutUint32(key, v)
+		case uint64:
+			*buf = textenc.PutUint64(key, v)
+		case float32:
+			*buf = textenc.PutFloat32(key, v)
+		case float64:
+			*buf = textenc.PutFloat64(key, v)
+		case fmt.Stringer:
+			*buf = textenc.PutString(key, v.String())
+		default:
+			*buf = textenc.PutString(key, fmt.Sprint(v))
+		}
+	} else if n > 1 {
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprint(args...))
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
@@ -52,15 +92,67 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, format string, args ...any) {
 	buf := getb()
 	defer putb(buf)
-	header(trace, caller, log, buf, lv)
+	*buf = textenc.PutBegin(*buf)
+	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
+	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
+	if trace != "" {
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
+	}
+	if caller {
+		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip)
+		if !ok {
+			file = "###"
+			line = 0
+		} else {
+			slash := strings.LastIndex(file, log.sep)
+			if slash >= 0 {
+				file = file[slash:]
+			}
+		}
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
 		*buf = append(*buf, *attr...)
 	}
 	if len(args) >= 1 {
-		*buf = textenc.PutString(textenc.PutKey(*buf, msgFieldName), fmt.Sprintf(format, args...))
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprintf(format, args...))
 	} else {
-		*buf = textenc.PutString(textenc.PutKey(*buf, msgFieldName), format)
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, mesgFieldName), format)
+	}
+	*buf = textenc.PutEnd(*buf)
+	*buf = textenc.PutBreak(*buf)
+	log.Write(*buf)
+}
+
+func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, msg []byte) {
+	buf := getb()
+	defer putb(buf)
+	*buf = textenc.PutBegin(*buf)
+	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
+	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
+	if trace != "" {
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
+	}
+	if caller {
+		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip + writeExtraSkip)
+		if !ok {
+			file = "###"
+			line = 0
+		} else {
+			slash := strings.LastIndex(file, log.sep)
+			if slash >= 0 {
+				file = file[slash:]
+			}
+		}
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+	}
+	if attr != nil && len(*attr) >= 1 {
+		*buf = textenc.PutDelim(*buf)
+		*buf = append(*buf, *attr...)
+	}
+	if len(msg) >= 1 {
+		*buf = textenc.PutBytes(textenc.PutKeyRaw(*buf, mesgFieldName), msg)
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
@@ -105,19 +197,6 @@ func (b *buffer) Write(p []byte) (int, error) {
 	*b = append(*b, p...)
 	return len(p), nil
 }
-
-// func (b *buffer) WriteString(s string) {
-// 	*b = append(*b, s...)
-// }
-
-// func (b *buffer) WriteByte(c byte) error {
-// 	*b = append(*b, c)
-// 	return nil
-// }
-
-// func (b *buffer) String() string {
-// 	return string(*b)
-// }
 
 var fpool = sync.Pool{New: func() any { return &fieldLogger{} }}
 

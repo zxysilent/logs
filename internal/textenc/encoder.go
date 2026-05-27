@@ -15,6 +15,16 @@ func PutKey(dst []byte, key string) []byte {
 	return append(quoteString(dst, key, true), '=')
 }
 
+// PutKeyRaw appends a new key without quoting check.
+// Use for internal keys that are known to be valid (no spaces/tabs).
+func PutKeyRaw(dst []byte, key string) []byte {
+	if len(dst) > 0 {
+		dst = append(dst, ' ')
+	}
+	dst = append(dst, key...)
+	return append(dst, '=')
+}
+
 // PutNil inserts a 'Nil' object into the dst byte array.
 func PutNil(dst []byte) []byte {
 	return append(dst, "nil"...)

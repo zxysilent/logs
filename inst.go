@@ -2,8 +2,10 @@ package logs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 var log = New(os.Stderr)
@@ -76,6 +78,24 @@ func Errorf(foramt string, args ...any) {
 	}
 }
 
+func Print(args ...any) {
+	if LINFO >= log.level {
+		print("", LINFO, log.caller, log, nil, args...)
+	}
+}
+
+func Println(args ...any) {
+	if LINFO >= log.level {
+		print("", LINFO, log.caller, log, nil, strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	}
+}
+
+func Printf(foramt string, args ...any) {
+	if LINFO >= log.level {
+		printf("", LINFO, log.caller, log, nil, foramt, args...)
+	}
+}
+
 func With() *fieldLogger {
 	return log.With()
 }
@@ -102,4 +122,8 @@ func SetMaxSize(ms int64) {
 
 func SetCons(b bool) {
 	log.SetCons(b)
+}
+
+func Ns(ns string) *NsLogger {
+	return &NsLogger{lg: log, ns: ns}
 }

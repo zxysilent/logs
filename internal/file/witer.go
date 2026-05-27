@@ -29,17 +29,22 @@ type Writer struct {
 	fsuffix string    // 文件后缀名 默认 .log
 	created time.Time // 文件创建日期
 	creates []byte    // 文件创建日期 for compare
-	cons    bool      // 标准输出  默认 false
+	cons    bool      // 标准输出  默认 true
 	file    *os.File
 	bw      *bufio.Writer
 	tk      *time.Ticker
 	mu      sync.Mutex
 }
 
-func New(path string) *Writer {
+func New(path string, cons ...bool) *Writer {
+	consv := false
+	if len(cons) > 0 {
+		consv = cons[0]
+	}
 	w := &Writer{
 		fpath: path, //dir1/dir2/app.log
 		mu:    sync.Mutex{},
+		cons:  consv,
 	}
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2
 	w.fsuffix = filepath.Ext(w.fpath)                               //.log
@@ -84,15 +89,12 @@ func (w *Writer) SetCons(b bool) {
 	w.mu.Unlock()
 }
 
-func (w *Writer) equalDate(file []byte, msg []byte) bool {
+func (w *Writer) equaldate(file []byte, msg []byte) bool {
 	// Only supports zxysilent/logs
-	if len(file) < 10 || len(msg) < 20 {
+	if len(file) < 10 || len(msg) < 15 {
 		return true
 	}
-	if bytes.HasPrefix(msg, []byte("time")) { //for text
-		return bytes.Equal(file[:10], msg[5:15])
-	}
-	return bytes.Equal(file[:10], msg[9:19]) ///for json
+	return bytes.Equal(file[:10], msg[5:15])
 }
 func (w *Writer) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
@@ -107,7 +109,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		}
 	}
 	// 按天切割
-	if !w.equalDate(w.creates, p) { //2023-04-05
+	if !w.equaldate(w.creates, p) { //2023-04-05
 		go w.delete() // 每天检测一次旧文件
 		if err := w.rotate(); err != nil {
 			return 0, err
@@ -184,6 +186,7 @@ func (w *Writer) name2time(name string) (time.Time, error) {
 	name = strings.TrimSuffix(name, w.fsuffix)
 	return time.Parse(".2006-01-02-150405", name)
 }
+
 func (w *Writer) time2name(t time.Time) string {
 	return t.Format(".2006-01-02-150405")
 }

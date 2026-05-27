@@ -1,5 +1,10 @@
 package logs
 
+import (
+	"fmt"
+	"strings"
+)
+
 type fieldLogger struct {
 	attr   *buffer //调用输出后清空
 	logger *Logger
@@ -8,7 +13,7 @@ type fieldLogger struct {
 	skip   bool
 }
 
-// Dup for group field, the caller of Dup need to call Rel、Debug*、Info*、Warn* or Error* to release resources.
+// Dup duplicate for group field, the caller of Dup need to call Rel、Debug*、Info*、Warn* or Error* to release resources.
 func (s *fieldLogger) Dup() *fieldLogger {
 	f := getfl()
 	f.logger = s.logger
@@ -19,7 +24,7 @@ func (s *fieldLogger) Dup() *fieldLogger {
 	return f
 }
 
-// Rel any message
+// Rel release any message
 func (s *fieldLogger) Rel() {
 	putfl(s)
 }
@@ -82,4 +87,22 @@ func (fl *fieldLogger) Errorf(foramt string, args ...any) {
 		printf(fl.trace, LERROR, fl.caller, fl.logger, fl.attr, foramt, args...)
 	}
 	putfl(fl)
+}
+
+func (fl *fieldLogger) Print(args ...any) {
+	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
+		print(fl.trace, LINFO, fl.caller, fl.logger, nil, args...)
+	}
+}
+
+func (fl *fieldLogger) Println(args ...any) {
+	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
+		print(fl.trace, LINFO, fl.caller, fl.logger, nil, strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	}
+}
+
+func (fl *fieldLogger) Printf(foramt string, args ...any) {
+	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
+		printf(fl.trace, LINFO, fl.caller, fl.logger, nil, foramt, args...)
+	}
 }

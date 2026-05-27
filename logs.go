@@ -23,7 +23,7 @@ const (
 	timeFieldName   = "time"
 	traceFieldName  = "trace"
 	levelFieldName  = "level"
-	msgFieldName    = "msg"
+	mesgFieldName   = "msg"
 	errorFieldName  = "error"
 	callerFieldName = "caller"
 )
@@ -54,11 +54,12 @@ func New(out io.Writer) *Logger {
 		skip:   0,
 		sep:    "/",
 	}
+	n.HijackLog()
 	return n
 }
 
 func (l *Logger) SetFile(path string) {
-	l.fw = file.New(path)
+	l.fw = file.New(path, l.caller)
 	l.SetOutput(l.fw)
 }
 
@@ -135,6 +136,7 @@ func (l *Logger) SetOutput(out io.Writer) {
 	l.out = out
 	l.mu.Unlock()
 }
+
 func (l *Logger) Write(p []byte) (int, error) {
 	return l.out.Write(p)
 }
@@ -191,6 +193,7 @@ func (l *Logger) Warnf(foramt string, args ...any) {
 		printf("", LWARN, l.caller, l, nil, foramt, args...)
 	}
 }
+
 func (l *Logger) Error(args ...any) {
 	if LERROR >= l.level {
 		print("", LERROR, l.caller, l, nil, args...)
@@ -201,8 +204,4 @@ func (l *Logger) Errorf(foramt string, args ...any) {
 	if LERROR >= l.level {
 		printf("", LERROR, l.caller, l, nil, foramt, args...)
 	}
-}
-
-func (l *Logger) Writer() io.Writer {
-	return l
 }
