@@ -2,10 +2,8 @@ package logs
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"strings"
 )
 
 var log = New(os.Stderr)
@@ -86,7 +84,7 @@ func Print(args ...any) {
 
 func Println(args ...any) {
 	if LINFO >= log.level {
-		print("", LINFO, log.caller, log, nil, strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+		print("", LINFO, log.caller, log, nil, args...)
 	}
 }
 
