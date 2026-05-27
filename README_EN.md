@@ -1,22 +1,22 @@
-# logs — 简单高效的 golang 结构化日志库
+# logs — Simple & Fast Structured Logging for Go
 
-[English](README_EN.md)
+[中文文档](README.md)
 
-## 特性
+## Features
 
-- **四级日志**：`DEBUG` `INFO` `WARN` `ERROR`
-- **自建实例或全局默认**：`logs.New(w)` 或直接用包级函数
-- **结构化字段链**：`With().Str("k","v").Int("n",1).Info()`
-- **命名空间 (Ns)**：`Ns("api").Info()` → `trace=api`
-- **链路追踪**：`TraceCtx` / `TraceId` / `Ctx`
-- **自动劫持标准库** `log`：`New()` 自动转换 stdlog → logfmt
-- **兼容标准库签名**：`Print/Printf/Println`
-- **写入文件**：按天切分，可设最大天数/单文件大小，可同时输出控制台
-- **高性能**：关键路径零分配，`sync.Pool` 复用 buffer
+- **Four log levels**: `DEBUG` `INFO` `WARN` `ERROR`
+- **Global default or custom instances**: `logs.New(w)` or package-level functions
+- **Structured field chains**: `With().Str("k","v").Int("n",1).Info()`
+- **Namespace (Ns)**: `Ns("api").Info()` → `trace=api`
+- **Distributed tracing**: `TraceCtx` / `TraceId` / `Ctx`
+- **Auto-hijack stdlib** `log`: `New()` converts stdlog → logfmt automatically
+- **Stdlib-compatible signatures**: `Print/Printf/Println`
+- **File output**: daily rotation, configurable max age/size, optional console mirroring
+- **High performance**: zero-allocation fast path, `sync.Pool` buffer reuse
 
 ---
 
-## 快速开始
+## Quick Start
 
 ```go
 package main
@@ -29,38 +29,38 @@ import (
 )
 
 func main() {
-    // === 默认全局实例 ===
-    logs.SetLevel(logs.LDEBUG) // 开发环境 LDEBUG，线上 LINFO
+    // === Default global instance ===
+    logs.SetLevel(logs.LDEBUG) // LDEBUG for dev, LINFO for production
     logs.SetCaller(true)
     logs.Info("hello world")
 
-    // === 命名空间 (Ns) ===
+    // === Namespace (Ns) ===
     apiLog := logs.Ns("api")
     apiLog.Info("server started")                  // trace=api
     ctx := logs.TraceCtx(context.Background(), "req-1")
     apiLog.Ctx(ctx).Info("handle")                 // trace=api·req-1
 
-    // === 结构化字段 ===
+    // === Structured fields ===
     logs.With().
         Str("user", "alice").
         Int("age", 30).
         Info("user login")
 
-    // === 链路追踪 ===
+    // === Distributed tracing ===
     ctx = logs.TraceCtx(context.Background())
     logs.Ctx(ctx).Str("op", "query").Debug("trace")
 
-    // === 标准库兼容 ===
+    // === Stdlib compatibility ===
     logs.Print("stdlib", "message")                // msg=stdlibmessage
     logs.Printf("stdlib %s", "format")             // msg=stdlib format
-    stdlog.Println("auto hijacked to logfmt")      // New() 自动劫持
+    stdlog.Println("auto hijacked to logfmt")      // hijacked by New()
 
-    // === 自定义实例 (文件输出) ===
+    // === Custom instance (file output) ===
     applog := logs.New(nil)
     applog.SetFile("./logs/app.log")
-    applog.SetCons(true)   // 同时输出控制台
-    applog.SetMaxAge(7)    // 保留 7 天
-    applog.SetMaxSize(64)  // 单文件最大 64MB
+    applog.SetCons(true)   // also print to stderr
+    applog.SetMaxAge(7)    // keep 7 days
+    applog.SetMaxSize(64)  // max 64MB per file
     defer applog.Close()
     applog.Info("app started")
 }
@@ -68,33 +68,33 @@ func main() {
 
 ---
 
-## API 参考
+## API Reference
 
-### 日志等级
+### Log Levels
 
-| 常量 | 值 | 说明 |
-|------|-----|------|
-| `logs.LDEBUG` | 0 | 调试 |
-| `logs.LINFO` | 1 | 常规 |
-| `logs.LWARN` | 2 | 警告 |
-| `logs.LERROR` | 3 | 错误 |
-| `logs.LNONE` | 4 | 关闭 |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `logs.LDEBUG` | 0 | Debug |
+| `logs.LINFO` | 1 | Info |
+| `logs.LWARN` | 2 | Warning |
+| `logs.LERROR` | 3 | Error |
+| `logs.LNONE` | 4 | Disabled |
 
-### 全局函数（操作默认实例）
+### Package-level Functions (operate on default instance)
 
 ```go
-logs.SetLevel(lv logLevel)                          // 设置等级
-logs.SetCaller(b bool)                              // 开启/关闭调用行号
-logs.SetSep(sep string)                             // 路径分隔符，默认 "/"
-logs.SetSkip(skip int)                              // 额外跳帧
-logs.SetOutput(out io.Writer)                       // 设置输出
-logs.SetFile(path string)                           // 设置文件输出
-logs.SetMaxAge(ma int)                              // 最大保留天数，默认 31
-logs.SetMaxSize(ms int64)                           // 单文件最大容量(MB)，默认 64
-logs.SetCons(b bool)                                // 同时输出控制台
-logs.Close() error                                  // 关闭
+logs.SetLevel(lv logLevel)                          // set log level
+logs.SetCaller(b bool)                              // enable/disable caller line
+logs.SetSep(sep string)                             // path separator, default "/"
+logs.SetSkip(skip int)                              // extra caller skip frames
+logs.SetOutput(out io.Writer)                       // set output writer
+logs.SetFile(path string)                           // set file output
+logs.SetMaxAge(ma int)                              // max retention days, default 31
+logs.SetMaxSize(ms int64)                           // max file size (MB), default 64
+logs.SetCons(b bool)                                // also print to stderr
+logs.Close() error                                  // close
 
-// 输出
+// Output
 logs.Debug(args ...any)
 logs.Debugf(format string, args ...any)
 logs.Info(args ...any)
@@ -104,24 +104,24 @@ logs.Warnf(format string, args ...any)
 logs.Error(args ...any)
 logs.Errorf(format string, args ...any)
 
-// 标准库兼容
+// Stdlib compatibility
 logs.Print(args ...any)
 logs.Println(args ...any)
 logs.Printf(format string, args ...any)
 
-// 字段链 / 追踪
+// Field chain / tracing
 logs.With() *fieldLogger
 logs.Ctx(ctx context.Context) *fieldLogger
 
-// 命名空间
+// Namespace
 logs.Ns(ns string) *NsLogger
 ```
 
-### Logger（自建实例）
+### Logger (custom instance)
 
 ```go
-l := logs.New(w io.Writer) // w 为 nil 时 Discard
-// 所有全局函数对应的同名方法
+l := logs.New(w io.Writer) // nil means Discard
+// All package-level functions have corresponding methods
 l.SetLevel(lv)  l.SetCaller(b)  l.SetSep(s)  l.SetSkip(n)
 l.SetOutput(w)  l.SetFile(p)    l.SetMaxAge(d) l.SetMaxSize(s)
 l.SetCons(b)    l.Close()
@@ -129,10 +129,10 @@ l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
 l.Warn(...)   l.Warnf(...)   l.Error(...) l.Errorf(...)
 l.Print(...)  l.Println(...) l.Printf(...)
 l.With() *fieldLogger   l.Ctx(ctx) *fieldLogger
-l.Writer() io.Writer     // 返回 io.Writer，输出 logfmt
+l.Writer() io.Writer     // returns an io.Writer, writes logfmt
 ```
 
-### NsLogger（命名空间日志）
+### NsLogger (namespaced logger)
 
 ```go
 api := logs.Ns("api")
@@ -141,13 +141,13 @@ api.Warn(...)   api.Warnf(...)   api.Error(...) api.Errorf(...)
 api.Print(...)  api.Println(...) api.Printf(...)
 api.With() *fieldLogger
 api.Ctx(ctx context.Context) *fieldLogger
-// trace = ns（无 ctx）或 ns·trace（有 ctx）
+// trace = ns (no ctx) or ns·trace (with ctx)
 ```
 
-### fieldLogger（结构化字段 + 输出控制）
+### fieldLogger (structured fields + output control)
 
 ```go
-// 字段
+// Fields
 fl.Str(key, val string)          fl.Stringer(key string, val fmt.Stringer)
 fl.Bytes(key string, val []byte) fl.Err(err error)    fl.IfErr(err error)
 fl.Bool(key string, b bool)
@@ -159,15 +159,15 @@ fl.Float32(key string, f float32) fl.Float64(key string, f float64)
 fl.Time(key string, t time.Time) fl.Dur(key string, d time.Duration)
 fl.Any(key string, i any)        fl.Raw(key string, b []byte)
 
-// 控制
-fl.If(b bool)                    // 条件输出
-fl.Caller(b bool)                // 每条单独控制 caller
+// Control
+fl.If(b bool)                    // conditional output
+fl.Caller(b bool)                // per-entry caller control
 
 // Dup/Rel
-fl.Dup() *fieldLogger            // 复制字段链，复用
-fl.Rel()                         // 释放
+fl.Dup() *fieldLogger            // duplicate field chain for reuse
+fl.Rel()                         // release
 
-// 终端方法（调用后 fieldLogger 被回收）
+// Terminal methods (fieldLogger is recycled after call)
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
 fl.Info(args ...any)    fl.Infof(format string, args ...any)
 fl.Warn(args ...any)    fl.Warnf(format string, args ...any)
@@ -175,38 +175,38 @@ fl.Error(args ...any)   fl.Errorf(format string, args ...any)
 fl.Print(args ...any)   fl.Println(args ...any)   fl.Printf(format string, args ...any)
 ```
 
-### 链路追踪
+### Distributed Tracing
 
 ```go
-ctx := logs.TraceCtx(context.Background())          // 生成新 trace
-ctx := logs.TraceCtx(context.Background(), "myid")  // 使用指定 id
-ctx = logs.TraceCtx(ctx, "child")                   // 追加 → myid.child
-ctx = logs.TraceCtx(ctx)                            // 复用已有 trace
-traceId := logs.TraceOf(ctx)                        // 读取 trace
-id := logs.TraceId()                                // 独立生成 trace id
+ctx := logs.TraceCtx(context.Background())          // generate new trace
+ctx := logs.TraceCtx(context.Background(), "myid")  // use specified id
+ctx = logs.TraceCtx(ctx, "child")                   // append → myid.child
+ctx = logs.TraceCtx(ctx)                            // reuse existing trace
+traceId := logs.TraceOf(ctx)                        // read trace
+id := logs.TraceId()                                // generate standalone id
 ```
 
-### 标准库集成
+### Stdlib Integration
 
 ```go
-// 自动劫持 — New() 调用 hijackstd()，stdlog → logfmt
-// prefix 自动作为日志 namespace
+// Auto-hijack — New() calls hijackstd(), converting stdlog → logfmt
+// prefix is captured as log namespace
 stdlog.SetPrefix("myprefix")
-_ = logs.New(nil)             // hijack 读取 prefix → trace=myprefix
+_ = logs.New(nil)             // hijack reads prefix → trace=myprefix
 stdlog.Println("hello")       // output: trace=myprefix level=INF msg=hello
 
-// Print 兼容 — 包级 Print/Printf/Println → logfmt
+// Print compat — package-level Print/Printf/Println → logfmt
 logs.Print("a", "b")          // msg=ab
 logs.Printf("%s:%d", "k", 1)  // msg=k:1
 
-// Writer — 返回 io.Writer，适合桥接第三方库
+// Writer — returns io.Writer for bridging third-party libraries
 w := l.Writer()
 w.Write([]byte("raw message"))
 ```
 
 ---
 
-## 输出格式（logfmt）
+## Output Format (logfmt)
 
 ```
 time=2026-01-01T12:00:00.000 level=INF msg="hello world"
@@ -214,14 +214,14 @@ time=2026-01-01T12:00:00.000 level=INF trace=api·req-1 caller=/main.go:42 user=
 time=2026-01-01T12:00:00.000 level=ERR trace=api error="something failed" msg="request failed"
 ```
 
-- `time` / `level` 始终存在
-- `trace` — 有链路/命名空间时存在
-- `caller` — 开启 `SetCaller(true)` 时存在（`file:line`）
-- `error` — 调用 `Err/IfErr` 时存在
+- `time` / `level` always present
+- `trace` — present when tracing/namespace is used
+- `caller` — present when `SetCaller(true)` is set (`file:line`)
+- `error` — present when `Err/IfErr` is called
 
 ---
 
-## xorm 集成
+## xorm Integration
 
 ```go
 db.AddHook(&repoHook{showSql: true})
@@ -249,7 +249,7 @@ func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
 
 ---
 
-## 性能
+## Performance
 
 ```
 pkg: github.com/zxysilent/logs
@@ -266,15 +266,14 @@ BenchmarkParallel         97 ns/op,   0 B/op, 0 allocs
 BenchmarkParallelSpan     80 ns/op,   0 B/op, 0 allocs
 ```
 
-### 优化要点
+### Optimizations
 
-- 内置 key（`time`/`level`/`trace`/`caller`/`msg`）使用 `PutKeyRaw`，跳过 quoting
-- 单参数类型分派，绕过 `fmt.Sprint`
-- `sync.Pool` 复用 buffer，关键路径 0 分配
+- Built-in keys (`time`/`level`/`trace`/`caller`/`msg`) skip quoting via `PutKeyRaw`
+- Single-argument type dispatch bypasses `fmt.Sprint`
+- `sync.Pool` buffer reuse, zero-allocation fast path
 
 ---
 
-## 灵感来源
+## Inspired by
 
 [zerolog](https://github.com/rs/zerolog/)
-
