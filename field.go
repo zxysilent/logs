@@ -86,21 +86,21 @@ func (fl *fieldLogger) Errorf(foramt string, args ...any) {
 
 func (fl *fieldLogger) Print(args ...any) {
 	if !fl.skip && LINFO >= fl.logger.level {
-		print(fl.trace, LINFO, fl.caller, fl.logger, nil, args...)
+		print(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, args...)
 	}
 	putfl(fl)
 }
 
 func (fl *fieldLogger) Println(args ...any) {
 	if !fl.skip && LINFO >= fl.logger.level {
-		print(fl.trace, LINFO, fl.caller, fl.logger, nil, args...)
+		print(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, args...)
 	}
 	putfl(fl)
 }
 
 func (fl *fieldLogger) Printf(foramt string, args ...any) {
 	if !fl.skip && LINFO >= fl.logger.level {
-		printf(fl.trace, LINFO, fl.caller, fl.logger, nil, foramt, args...)
+		printf(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, foramt, args...)
 	}
 	putfl(fl)
 }
