@@ -11,7 +11,7 @@
 - **链路追踪**：`TraceCtx` / `TraceId` / `Ctx`
 - **自动劫持标准库** `log`：`New()` 自动转换 stdlog → logfmt
 - **兼容标准库签名**：`Print/Printf/Println`
-- **写入文件**：按天切分，可设最大天数/单文件大小，可同时输出控制台
+- **写入文件**：按天切分，可设最大天数/单文件大小，默认同时输出控制台，也可关闭
 - **高性能**：关键路径零分配，`sync.Pool` 复用 buffer
 
 ---
@@ -255,22 +255,22 @@ func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
 pkg: github.com/zxysilent/logs
 cpu: 12th Gen Intel(R) Core(TM) i5-12500H
 
-BenchmarkSimple           95 ns/op,   0 B/op, 0 allocs
-BenchmarkInfof           158 ns/op,  16 B/op, 1 allocs
-BenchmarkWith5Fields     296 ns/op,   0 B/op, 0 allocs
-BenchmarkWith10Fields    539 ns/op,   0 B/op, 0 allocs
-BenchmarkError           192 ns/op,   0 B/op, 0 allocs
-BenchmarkDisabled        0.5 ns/op,   0 B/op, 0 allocs
-BenchmarkParallelSimple   14 ns/op,   0 B/op, 0 allocs
-BenchmarkParallel         97 ns/op,   0 B/op, 0 allocs
-BenchmarkParallelSpan     80 ns/op,   0 B/op, 0 allocs
+BenchmarkDisabled        0.5 ns/op,   0 B/op, 0 allocs   // 过滤快速路径
+BenchmarkParallelSimple   13 ns/op,   0 B/op, 0 allocs   // 并行裸输出
+BenchmarkParallelSpan     64 ns/op,   0 B/op, 0 allocs   // 并行 Dup+Span
+BenchmarkSimple           69 ns/op,   0 B/op, 0 allocs   // 基础 Info()
+BenchmarkParallel         88 ns/op,   0 B/op, 0 allocs   // 并行 With 7 字段
+BenchmarkInfof           123 ns/op,  16 B/op, 1 allocs   // 格式化输出
+BenchmarkError           167 ns/op,   0 B/op, 0 allocs   // Error 日志
+BenchmarkWith5Fields     282 ns/op,   0 B/op, 0 allocs   // 5 个结构化字段
+BenchmarkWith10Fields    430 ns/op,   0 B/op, 0 allocs   // 10 个结构化字段
 ```
 
 ### 优化要点
 
-- 内置 key（`time`/`level`/`trace`/`caller`/`msg`）使用 `PutKeyRaw`，跳过 quoting
-- 单参数类型分派，绕过 `fmt.Sprint`
-- `sync.Pool` 复用 buffer，关键路径 0 分配
+- 内置 key（`time`/`level`/`trace`/`caller`/`msg`）使用 `PutKeyRaw`，跳过 quoting 检查
+- 单参数类型分派（string/int*/uint*/float*/bool/[]byte/`fmt.Stringer`），绕过 `fmt.Sprint` 的 interface dispatch
+- buffer / fieldLogger 均由 `sync.Pool` 复用，关键路径 0 分配
 
 ---
 

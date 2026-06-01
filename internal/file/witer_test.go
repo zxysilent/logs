@@ -95,7 +95,4 @@ func TestWriterLifecycle(t *testing.T) {
 	if err := w.Close(); err != nil {
 		t.Fatalf("close failed: %v", err)
 	}
-	if err := w.close(); err != nil {
-		t.Fatalf("close on already closed writer failed: %v", err)
-	}
 }

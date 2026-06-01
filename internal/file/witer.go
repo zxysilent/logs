@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,18 +24,19 @@ type Writer struct {
 	maxage  int       // 最大保留天数
 	maxsize int64     // 单个日志最大容量 默认 64MB
 	size    int64     // 累计大小
+	cons    bool      // 标准输出  默认false
 	fpath   string    // 文件目录 完整路径 fpath=fdir+fname+fsuffix
 	fdir    string    //
 	fname   string    // 文件名
 	fsuffix string    // 文件后缀名 默认 .log
 	created time.Time // 文件创建日期
 	creates []byte    // 文件创建日期 for compare
-	cons    bool      // 标准输出  默认false
 	file    *os.File
 	bw      *bufio.Writer
 	tk      *time.Ticker
 	mu      sync.Mutex
 	done    chan struct{}
+	closed  int32 // 0 = open, 1 = closed
 }
 
 func New(path string, cons ...bool) *Writer {
@@ -110,6 +112,9 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	if w.cons {
 		os.Stderr.Write(p)
 	}
+	if atomic.LoadInt32(&w.closed) != 0 {
+		return 0, os.ErrClosed
+	}
 	if w.file == nil {
 		if err := w.rotate(); err != nil {
 			os.Stderr.Write(p)
@@ -168,11 +173,14 @@ func (w *Writer) rotate() error {
 
 // 删除旧日志
 func (w *Writer) delete() {
-	if w.maxage <= 0 {
+	w.mu.Lock()
+	maxage := w.maxage
+	w.mu.Unlock()
+	if maxage <= 0 {
 		return
 	}
 	dir := filepath.Dir(w.fpath)
-	fakeNow := time.Now().AddDate(0, 0, -w.maxage)
+	fakeNow := time.Now().AddDate(0, 0, -maxage)
 	dirs, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -199,15 +207,22 @@ func (w *Writer) time2name(t time.Time) string {
 	return t.Format(".2006-01-02-150405")
 }
 
-func (w *Writer) Close() error {
-	w.tk.Stop()
-	w.flush()
-	close(w.done)
-	return w.close()
+func (w *Writer) flush() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.bw == nil {
+		return nil
+	}
+	return w.bw.Flush()
 }
 
-// close closes the file if it is open.
-func (w *Writer) close() error {
+func (w *Writer) Close() error {
+	if !atomic.CompareAndSwapInt32(&w.closed, 0, 1) {
+		return nil
+	}
+	w.tk.Stop()
+	close(w.done)
+	w.flush()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.file == nil {
@@ -216,14 +231,6 @@ func (w *Writer) close() error {
 	w.file.Sync()
 	err := w.file.Close()
 	w.file = nil
+	w.bw = nil
 	return err
-}
-
-func (w *Writer) flush() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.bw == nil {
-		return nil
-	}
-	return w.bw.Flush()
 }

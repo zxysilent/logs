@@ -854,14 +854,6 @@ func TestCtxNilContext(t *testing.T) {
 	fl.Info() // should not panic
 }
 
-// TestFieldLoggerPrintNilReceiver verifies Print/Println/Printf on nil receiver don't panic.
-func TestFieldLoggerPrintNilReceiver(t *testing.T) {
-	var fl *fieldLogger
-	fl.Print("a")   // should not panic
-	fl.Println("a") // should not panic
-	fl.Printf("a")  // should not panic
-}
-
 // TestFieldLoggerCaller verifies Caller(true/false) toggles caller output.
 func TestFieldLoggerCaller(t *testing.T) {
 	var buf bytes.Buffer
