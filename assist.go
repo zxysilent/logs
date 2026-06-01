@@ -174,7 +174,7 @@ func getb() *buffer {
 	return bpool.Get().(*buffer)
 }
 
-const maxBufferSize = 2 << 8
+const maxBufferSize = 512
 
 func putb(b *buffer) {
 	if b == nil {

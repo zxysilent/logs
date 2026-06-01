@@ -138,6 +138,9 @@ func (s *fieldLogger) Uint16(key string, i uint16) *fieldLogger {
 }
 
 func (s *fieldLogger) Uint32(key string, i uint32) *fieldLogger {
+	if s.attr == nil {
+		return s
+	}
 	*s.attr = textenc.PutUint32(textenc.PutKey(*s.attr, key), i)
 	return s
 }
@@ -171,7 +174,6 @@ func (s *fieldLogger) Time(key string, t time.Time) *fieldLogger {
 		return s
 	}
 	*s.attr = textenc.PutTime(textenc.PutKey(*s.attr, key), t)
-	// *s.attr = textenc.PutTime(textenc.PutKey(*s.attr, key), t, timeFieldFormat)
 	return s
 }
 

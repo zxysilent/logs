@@ -1,10 +1,5 @@
 package logs
 
-import (
-	"fmt"
-	"strings"
-)
-
 type fieldLogger struct {
 	attr   *buffer //调用输出后清空
 	logger *Logger
@@ -90,19 +85,22 @@ func (fl *fieldLogger) Errorf(foramt string, args ...any) {
 }
 
 func (fl *fieldLogger) Print(args ...any) {
-	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
+	if !fl.skip && LINFO >= fl.logger.level {
 		print(fl.trace, LINFO, fl.caller, fl.logger, nil, args...)
 	}
+	putfl(fl)
 }
 
 func (fl *fieldLogger) Println(args ...any) {
-	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
-		print(fl.trace, LINFO, fl.caller, fl.logger, nil, strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	if !fl.skip && LINFO >= fl.logger.level {
+		print(fl.trace, LINFO, fl.caller, fl.logger, nil, args...)
 	}
+	putfl(fl)
 }
 
 func (fl *fieldLogger) Printf(foramt string, args ...any) {
-	if fl != nil && fl.logger != nil && LINFO >= fl.logger.level {
+	if !fl.skip && LINFO >= fl.logger.level {
 		printf(fl.trace, LINFO, fl.caller, fl.logger, nil, foramt, args...)
 	}
+	putfl(fl)
 }
