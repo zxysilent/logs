@@ -844,6 +844,97 @@ func TestRelNil(t *testing.T) {
 	fl.Rel() // should not panic
 }
 
+// TestFieldLoggerPrint verifies fieldLogger Print/Println/Printf with fields.
+func TestFieldLoggerPrint(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(false)
+	l.SetLevel(LINFO)
+
+	l.With().Str("k", "v").Print("p1", "p2")
+	got := buf.String()
+	if !strings.Contains(got, `k=v`) {
+		t.Fatalf("fieldLogger.Print k=v missing: %s", got)
+	}
+	if !strings.Contains(got, `p1p2`) {
+		t.Fatalf("fieldLogger.Print msg mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.With().Int("n", 1).Println("pl")
+	got = buf.String()
+	if !strings.Contains(got, `n=1`) {
+		t.Fatalf("fieldLogger.Println n=1 missing: %s", got)
+	}
+
+	buf.Reset()
+	l.With().Str("k", "v").Printf("%s:%d", "a", 1)
+	got = buf.String()
+	if !strings.Contains(got, `k=v`) {
+		t.Fatalf("fieldLogger.Printf k=v missing: %s", got)
+	}
+	if !strings.Contains(got, `a:1`) {
+		t.Fatalf("fieldLogger.Printf msg mismatch: %s", got)
+	}
+}
+
+// TestFieldLoggerPrintSkip verifies If(false) + Print skips output.
+func TestFieldLoggerPrintSkip(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(false)
+	l.SetLevel(LINFO)
+
+	l.With().If(false).Print("should-not-appear")
+	if got := buf.String(); got != "" {
+		t.Fatalf("If(false).Print should be filtered: %s", got)
+	}
+}
+
+// TestNsLoggerFormatted verifies NsLogger *f methods and Println/Printf.
+func TestNsLoggerFormatted(t *testing.T) {
+	var buf bytes.Buffer
+	l := Ns("svc")
+	l.lg.SetOutput(&buf)
+	l.lg.SetCaller(false)
+	l.lg.SetLevel(LDEBUG)
+
+	l.Debugf("debug %s", "test")
+	if got := buf.String(); !strings.Contains(got, "trace=svc") || !strings.Contains(got, "debug test") {
+		t.Fatalf("NsLogger.Debugf mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.Infof("info %s", "test")
+	if got := buf.String(); !strings.Contains(got, "info test") {
+		t.Fatalf("NsLogger.Infof mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.Warnf("warn %s", "test")
+	if got := buf.String(); !strings.Contains(got, "warn test") {
+		t.Fatalf("NsLogger.Warnf mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.Errorf("error %s", "test")
+	if got := buf.String(); !strings.Contains(got, "error test") {
+		t.Fatalf("NsLogger.Errorf mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.Printf("%s:%d", "k", 1)
+	if got := buf.String(); !strings.Contains(got, "k:1") {
+		t.Fatalf("NsLogger.Printf mismatch: %s", got)
+	}
+
+	buf.Reset()
+	l.Println("a", "b")
+	if got := buf.String(); !strings.Contains(got, "trace=svc") {
+		t.Fatalf("NsLogger.Println trace missing: %s", got)
+	}
+}
+
 // TestCtxNilContext verifies Ctx with empty context doesn't panic.
 func TestCtxNilContext(t *testing.T) {
 	l := New(io.Discard)

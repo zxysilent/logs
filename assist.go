@@ -189,15 +189,6 @@ func putb(b *buffer) {
 	b = nil
 }
 
-func (b *buffer) Reset() {
-	*b = (*b)[:0]
-}
-
-func (b *buffer) Write(p []byte) (int, error) {
-	*b = append(*b, p...)
-	return len(p), nil
-}
-
 var fpool = sync.Pool{New: func() any { return &fieldLogger{} }}
 
 func getfl() *fieldLogger {
