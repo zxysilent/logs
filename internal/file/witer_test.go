@@ -34,15 +34,15 @@ func TestWriterLifecycle(t *testing.T) {
 		t.Fatalf("SetCons(false) not applied")
 	}
 
-	maxSize := w.maxSize
+	maxSize := w.maxsize
 	w.SetMaxSize(0)
-	if w.maxSize != maxSize {
+	if w.maxsize != maxSize {
 		t.Fatalf("SetMaxSize(0) should be ignored")
 	}
 
 	w.SetMaxSize(2)
 	w.SetMaxAge(7)
-	if w.maxAge != 7 {
+	if w.maxage != 7 {
 		t.Fatalf("SetMaxAge not applied")
 	}
 
@@ -86,7 +86,7 @@ func TestWriterLifecycle(t *testing.T) {
 	if err := os.WriteFile(stale, []byte("old"), 0o644); err != nil {
 		t.Fatalf("create stale file failed: %v", err)
 	}
-	w.maxAge = 1
+	w.maxage = 1
 	w.delete()
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Fatalf("stale file should be deleted, err=%v", err)

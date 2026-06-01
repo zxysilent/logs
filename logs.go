@@ -59,7 +59,7 @@ func New(out io.Writer) *Logger {
 }
 
 func (l *Logger) SetFile(path string) {
-	l.fw = file.New(path, l.caller)
+	l.fw = file.New(path, true)
 	l.SetOutput(l.fw)
 }
 
@@ -73,7 +73,7 @@ func (l *Logger) SetMaxAge(ma int) {
 	l.fw.SetMaxAge(ma)
 }
 
-// SetMaxSize 单个日志最大容量
+// SetMaxSize 单个日志最大容量 MiB
 func (l *Logger) SetMaxSize(ms int64) {
 	if l.fw == nil {
 		return

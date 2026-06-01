@@ -13,15 +13,15 @@ import (
 
 const (
 	sizeMiB    = 1024 * 1024
-	defMaxAge  = 64 //天
-	defMaxSize = 64 //MiB
+	defMaxage  = 64 //天
+	defMaxsize = 64 //MiB
 )
 
 var _ io.WriteCloser = (*Writer)(nil)
 
 type Writer struct {
-	maxAge  int       // 最大保留天数
-	maxSize int64     // 单个日志最大容量 默认 64MB
+	maxage  int       // 最大保留天数
+	maxsize int64     // 单个日志最大容量 默认 64MB
 	size    int64     // 累计大小
 	fpath   string    // 文件目录 完整路径 fpath=fdir+fname+fsuffix
 	fdir    string    //
@@ -34,6 +34,7 @@ type Writer struct {
 	bw      *bufio.Writer
 	tk      *time.Ticker
 	mu      sync.Mutex
+	done    chan struct{}
 }
 
 func New(path string, cons ...bool) *Writer {
@@ -45,6 +46,7 @@ func New(path string, cons ...bool) *Writer {
 		fpath: path, //dir1/dir2/app.log
 		mu:    sync.Mutex{},
 		cons:  consv,
+		done:  make(chan struct{}),
 	}
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2
 	w.fsuffix = filepath.Ext(w.fpath)                               //.log
@@ -52,33 +54,38 @@ func New(path string, cons ...bool) *Writer {
 	if w.fsuffix == "" {
 		w.fsuffix = ".log"
 	}
-	w.maxSize = sizeMiB * defMaxSize
-	w.maxAge = defMaxAge
+	w.maxsize = sizeMiB * defMaxsize
+	w.maxage = defMaxage
 	os.MkdirAll(filepath.Dir(w.fpath), 0755)
 	w.tk = time.NewTicker(time.Second * 5)
 	go w.daemon()
 	return w
 }
 func (w *Writer) daemon() {
-	for range w.tk.C {
-		w.flush()
+	for {
+		select {
+		case <-w.tk.C:
+			w.flush()
+		case <-w.done:
+			return
+		}
 	}
 }
 
 // SetMaxAge 最大保留天数
 func (w *Writer) SetMaxAge(ma int) {
 	w.mu.Lock()
-	w.maxAge = ma
+	w.maxage = ma
 	w.mu.Unlock()
 }
 
-// SetMaxSize 单个日志最大容量
+// SetMaxSize 单个日志最大容量MiB
 func (w *Writer) SetMaxSize(ms int64) {
 	if ms < 1 {
 		return
 	}
 	w.mu.Lock()
-	w.maxSize = ms
+	w.maxsize = ms * sizeMiB
 	w.mu.Unlock()
 }
 
@@ -116,7 +123,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		}
 	}
 	// 按大小切割
-	if w.size+int64(len(p)) >= w.maxSize {
+	if w.size+int64(len(p)) >= w.maxsize {
 		if err := w.rotate(); err != nil {
 			return 0, err
 		}
@@ -160,11 +167,11 @@ func (w *Writer) rotate() error {
 
 // 删除旧日志
 func (w *Writer) delete() {
-	if w.maxAge <= 0 {
+	if w.maxage <= 0 {
 		return
 	}
 	dir := filepath.Dir(w.fpath)
-	fakeNow := time.Now().AddDate(0, 0, -w.maxAge)
+	fakeNow := time.Now().AddDate(0, 0, -w.maxage)
 	dirs, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -194,6 +201,7 @@ func (w *Writer) time2name(t time.Time) string {
 func (w *Writer) Close() error {
 	w.tk.Stop()
 	w.flush()
+	close(w.done)
 	return w.close()
 }
 

@@ -12,18 +12,22 @@ func SetLevel(lv logLevel) {
 	log.SetLevel(lv)
 }
 
+// SetSep 设置调用信息分隔符
 func SetSep(sep string) {
 	log.SetSep(sep)
 }
 
+// SetCaller
 func SetCaller(b bool) {
 	log.SetCaller(b)
 }
 
+// SetSkip 设置调用信息跳过层数
 func SetSkip(skip int) {
 	log.SetSkip(skip)
 }
 
+// SetOutput 设置输出
 func SetOutput(out io.Writer) {
 	log.SetOutput(out)
 }
@@ -94,6 +98,7 @@ func Printf(foramt string, args ...any) {
 	}
 }
 
+// With 字段日志
 func With() *fieldLogger {
 	return log.With()
 }
@@ -102,26 +107,32 @@ func Ctx(ctx context.Context) *fieldLogger {
 	return log.Ctx(ctx)
 }
 
+// Close 关闭日志文件
 func Close() error {
 	return log.Close()
 }
 
+// SetFile 设置日志文件路径
 func SetFile(path string) {
 	log.SetFile(path)
 }
 
+// SetMaxAge 日志最大保存天数
 func SetMaxAge(ma int) {
 	log.SetMaxAge(ma)
 }
 
+// SetMaxSize 单个日志最大容量 MiB
 func SetMaxSize(ms int64) {
 	log.SetMaxSize(ms)
 }
 
+// SetCons 同时输出控制台
 func SetCons(b bool) {
 	log.SetCons(b)
 }
 
+// Ns 命名空间日志
 func Ns(ns string) *NsLogger {
 	return &NsLogger{lg: log, ns: ns}
 }
