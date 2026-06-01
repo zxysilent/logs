@@ -29,7 +29,7 @@ type Writer struct {
 	fsuffix string    // 文件后缀名 默认 .log
 	created time.Time // 文件创建日期
 	creates []byte    // 文件创建日期 for compare
-	cons    bool      // 标准输出  默认 true
+	cons    bool      // 标准输出  默认false
 	file    *os.File
 	bw      *bufio.Writer
 	tk      *time.Ticker
@@ -103,6 +103,7 @@ func (w *Writer) equaldate(file []byte, msg []byte) bool {
 	}
 	return bytes.Equal(file[:10], msg[5:15])
 }
+
 func (w *Writer) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
