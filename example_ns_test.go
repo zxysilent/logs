@@ -37,7 +37,7 @@ func Example_nsWith() {
 func Example_nsCtx() {
 	l := logs.Ns("myapp")
 	ctx := logs.TraceCtx(context.Background(), "req-1")
-	l.Ctx(ctx).Info("trace=myapp·req-1")
+	l.Ctx(ctx).Info("trace=myapp.req-1")
 	// Output:
 }
 

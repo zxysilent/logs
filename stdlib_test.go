@@ -79,8 +79,8 @@ func TestNsSubTrace(t *testing.T) {
 	ctx := TraceCtx(context.Background(), "req-1")
 	l.Ctx(ctx).Info("sub")
 	got := buf.String()
-	if !strings.Contains(got, "trace=myapp\u00b7req-1") {
-		t.Fatalf("ns·trace missing, got: %s", got)
+	if !strings.Contains(got, "trace=myapp.req-1") {
+		t.Fatalf("ns.trace missing, got: %s", got)
 	}
 }
 
@@ -96,7 +96,7 @@ func TestNsEmptyCtx(t *testing.T) {
 		t.Fatalf("ns with empty ctx missing, got: %s", got)
 	}
 	if strings.Contains(got, "\u00b7") {
-		t.Fatalf("unexpected dot with empty ctx, got: %s", got)
+		t.Fatalf("unexpected separator with empty ctx, got: %s", got)
 	}
 }
 

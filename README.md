@@ -38,7 +38,7 @@ func main() {
     apiLog := logs.Ns("api")
     apiLog.Info("server started")                  // trace=api
     ctx := logs.TraceCtx(context.Background(), "req-1")
-    apiLog.Ctx(ctx).Info("handle")                 // trace=api·req-1
+    apiLog.Ctx(ctx).Info("handle")                 // trace=api.req-1
 
     // === 结构化字段 ===
     logs.With().
@@ -141,7 +141,7 @@ api.Warn(...)   api.Warnf(...)   api.Error(...) api.Errorf(...)
 api.Print(...)  api.Println(...) api.Printf(...)
 api.With() *fieldLogger
 api.Ctx(ctx context.Context) *fieldLogger
-// trace = ns（无 ctx）或 ns·trace（有 ctx）
+// trace = ns（无 ctx）或 ns.trace（有 ctx）
 ```
 
 ### fieldLogger（结构化字段 + 输出控制）
@@ -210,7 +210,7 @@ w.Write([]byte("raw message"))
 
 ```
 time=2026-01-01T12:00:00.000 level=INF msg="hello world"
-time=2026-01-01T12:00:00.000 level=INF trace=api·req-1 caller=/main.go:42 user=alice msg=login
+time=2026-01-01T12:00:00.000 level=INF trace=api.req-1 caller=/main.go:42 user=alice msg=login
 time=2026-01-01T12:00:00.000 level=ERR trace=api error="something failed" msg="request failed"
 ```
 

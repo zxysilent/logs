@@ -92,7 +92,7 @@ func (n *NsLogger) Ctx(ctx context.Context) *fieldLogger {
 	f.caller = n.lg.caller
 	f.attr = getb()
 	if f.trace != "" {
-		f.trace = n.ns + "\u00b7" + f.trace
+		f.trace = n.ns + "." + f.trace
 	} else {
 		f.trace = n.ns
 	}
