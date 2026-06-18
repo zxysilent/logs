@@ -38,9 +38,9 @@ func Debug(args ...any) {
 	}
 }
 
-func Debugf(foramt string, args ...any) {
+func Debugf(format string, args ...any) {
 	if LDEBUG >= log.level {
-		printf("", LDEBUG, log.caller, log, nil, foramt, args...)
+		printf("", LDEBUG, log.caller, log, nil, format, args...)
 	}
 }
 
@@ -50,9 +50,9 @@ func Info(args ...any) {
 	}
 }
 
-func Infof(foramt string, args ...any) {
+func Infof(format string, args ...any) {
 	if LINFO >= log.level {
-		printf("", LINFO, log.caller, log, nil, foramt, args...)
+		printf("", LINFO, log.caller, log, nil, format, args...)
 	}
 }
 
@@ -62,9 +62,9 @@ func Warn(args ...any) {
 	}
 }
 
-func Warnf(foramt string, args ...any) {
+func Warnf(format string, args ...any) {
 	if LWARN >= log.level {
-		printf("", LWARN, log.caller, log, nil, foramt, args...)
+		printf("", LWARN, log.caller, log, nil, format, args...)
 	}
 }
 
@@ -74,9 +74,9 @@ func Error(args ...any) {
 	}
 }
 
-func Errorf(foramt string, args ...any) {
+func Errorf(format string, args ...any) {
 	if LERROR >= log.level {
-		printf("", LERROR, log.caller, log, nil, foramt, args...)
+		printf("", LERROR, log.caller, log, nil, format, args...)
 	}
 }
 
@@ -92,9 +92,9 @@ func Println(args ...any) {
 	}
 }
 
-func Printf(foramt string, args ...any) {
+func Printf(format string, args ...any) {
 	if LINFO >= log.level {
-		printf("", LINFO, log.caller, log, nil, foramt, args...)
+		printf("", LINFO, log.caller, log, nil, format, args...)
 	}
 }
 

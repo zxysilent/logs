@@ -46,9 +46,9 @@ func (l *Logger) Println(args ...any) {
 	}
 }
 
-func (l *Logger) Printf(foramt string, args ...any) {
+func (l *Logger) Printf(format string, args ...any) {
 	if LINFO >= l.level {
-		printf("", LINFO, l.caller, l, nil, foramt, args...)
+		printf("", LINFO, l.caller, l, nil, format, args...)
 	}
 }
 

@@ -36,9 +36,9 @@ func (fl *fieldLogger) Debug(args ...any) {
 	putfl(fl)
 }
 
-func (fl *fieldLogger) Debugf(foramt string, args ...any) {
+func (fl *fieldLogger) Debugf(format string, args ...any) {
 	if !fl.skip && LDEBUG >= fl.logger.level {
-		printf(fl.trace, LDEBUG, fl.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.trace, LDEBUG, fl.caller, fl.logger, fl.attr, format, args...)
 	}
 	putfl(fl)
 }
@@ -50,9 +50,9 @@ func (fl *fieldLogger) Info(args ...any) {
 	putfl(fl)
 }
 
-func (fl *fieldLogger) Infof(foramt string, args ...any) {
+func (fl *fieldLogger) Infof(format string, args ...any) {
 	if !fl.skip && LINFO >= fl.logger.level {
-		printf(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, format, args...)
 	}
 	putfl(fl)
 }
@@ -64,9 +64,9 @@ func (fl *fieldLogger) Warn(args ...any) {
 	putfl(fl)
 }
 
-func (fl *fieldLogger) Warnf(foramt string, args ...any) {
+func (fl *fieldLogger) Warnf(format string, args ...any) {
 	if !fl.skip && LWARN >= fl.logger.level {
-		printf(fl.trace, LWARN, fl.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.trace, LWARN, fl.caller, fl.logger, fl.attr, format, args...)
 	}
 	putfl(fl)
 }
@@ -77,9 +77,9 @@ func (fl *fieldLogger) Error(args ...any) {
 	putfl(fl)
 }
 
-func (fl *fieldLogger) Errorf(foramt string, args ...any) {
+func (fl *fieldLogger) Errorf(format string, args ...any) {
 	if !fl.skip && LERROR >= fl.logger.level {
-		printf(fl.trace, LERROR, fl.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.trace, LERROR, fl.caller, fl.logger, fl.attr, format, args...)
 	}
 	putfl(fl)
 }
@@ -98,9 +98,9 @@ func (fl *fieldLogger) Println(args ...any) {
 	putfl(fl)
 }
 
-func (fl *fieldLogger) Printf(foramt string, args ...any) {
+func (fl *fieldLogger) Printf(format string, args ...any) {
 	if !fl.skip && LINFO >= fl.logger.level {
-		printf(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, foramt, args...)
+		printf(fl.trace, LINFO, fl.caller, fl.logger, fl.attr, format, args...)
 	}
 	putfl(fl)
 }

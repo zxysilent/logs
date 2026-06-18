@@ -164,9 +164,9 @@ func (l *Logger) Debug(args ...any) {
 		print("", LDEBUG, l.caller, l, nil, args...)
 	}
 }
-func (l *Logger) Debugf(foramt string, args ...any) {
+func (l *Logger) Debugf(format string, args ...any) {
 	if LDEBUG >= l.level {
-		printf("", LDEBUG, l.caller, l, nil, foramt, args...)
+		printf("", LDEBUG, l.caller, l, nil, format, args...)
 	}
 }
 
@@ -176,9 +176,9 @@ func (l *Logger) Info(args ...any) {
 	}
 }
 
-func (l *Logger) Infof(foramt string, args ...any) {
+func (l *Logger) Infof(format string, args ...any) {
 	if LINFO >= l.level {
-		printf("", LINFO, l.caller, l, nil, foramt, args...)
+		printf("", LINFO, l.caller, l, nil, format, args...)
 	}
 }
 
@@ -188,9 +188,9 @@ func (l *Logger) Warn(args ...any) {
 	}
 }
 
-func (l *Logger) Warnf(foramt string, args ...any) {
+func (l *Logger) Warnf(format string, args ...any) {
 	if LWARN >= l.level {
-		printf("", LWARN, l.caller, l, nil, foramt, args...)
+		printf("", LWARN, l.caller, l, nil, format, args...)
 	}
 }
 
@@ -200,8 +200,8 @@ func (l *Logger) Error(args ...any) {
 	}
 }
 
-func (l *Logger) Errorf(foramt string, args ...any) {
+func (l *Logger) Errorf(format string, args ...any) {
 	if LERROR >= l.level {
-		printf("", LERROR, l.caller, l, nil, foramt, args...)
+		printf("", LERROR, l.caller, l, nil, format, args...)
 	}
 }
