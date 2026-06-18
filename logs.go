@@ -17,7 +17,7 @@ const (
 	LWARN
 	LERROR
 	LNONE
-	logShort = "DBGINFWRNERR" //DBG INF WRN ERR
+	logShort = "DBGINFWRNERRNIL" //DBG INF WRN ERR
 )
 const (
 	timeFieldName   = "time"

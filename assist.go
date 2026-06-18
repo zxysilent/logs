@@ -184,9 +184,7 @@ func putb(b *buffer) {
 	if cap(*b) <= maxBufferSize {
 		*b = (*b)[:0]
 		bpool.Put(b)
-		return
 	}
-	b = nil
 }
 
 var fpool = sync.Pool{New: func() any { return &fieldLogger{} }}
