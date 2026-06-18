@@ -96,3 +96,101 @@ func TestWriterLifecycle(t *testing.T) {
 		t.Fatalf("close failed: %v", err)
 	}
 }
+
+// TestWriteSizeRotate verifies a write exceeding maxsize triggers rotation.
+func TestWriteSizeRotate(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path)
+	defer w.Close()
+
+	// 1 MiB cap; write enough to exceed it and force a size-based rotate.
+	w.SetMaxSize(1)
+	chunk := make([]byte, 256*1024)
+	for i := 0; i < 6; i++ {
+		if _, err := w.Write(chunk); err != nil {
+			t.Fatalf("write %d failed: %v", i, err)
+		}
+	}
+	w.flush()
+
+	// At least one rotated backup file should exist.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir failed: %v", err)
+	}
+	rotated := 0
+	for _, e := range entries {
+		if e.Name() != "app.log" && strings.HasSuffix(e.Name(), ".log") {
+			rotated++
+		}
+	}
+	if rotated == 0 {
+		t.Fatalf("expected a rotated backup after exceeding maxsize, found none")
+	}
+}
+
+// TestWriteCrossDayRotate verifies a write on a new day triggers rotation.
+func TestWriteCrossDayRotate(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path)
+	defer w.Close()
+
+	// First write establishes the current file and its creation date.
+	if _, err := w.Write([]byte("time=2026-05-09T00:00:00 first\n")); err != nil {
+		t.Fatalf("first write failed: %v", err)
+	}
+	// Force creates to a known past date so the next write looks like a new day.
+	w.creates = []byte("2000-01-01")
+	if _, err := w.Write([]byte("time=2026-05-10T00:00:00 second\n")); err != nil {
+		t.Fatalf("cross-day write failed: %v", err)
+	}
+	w.flush()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir failed: %v", err)
+	}
+	rotated := 0
+	for _, e := range entries {
+		if e.Name() != "app.log" && strings.HasSuffix(e.Name(), ".log") {
+			rotated++
+		}
+	}
+	if rotated == 0 {
+		t.Fatalf("expected a rotated backup after crossing day, found none")
+	}
+}
+
+// TestWriteAfterClose verifies writing after Close returns os.ErrClosed.
+func TestWriteAfterClose(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path)
+
+	if _, err := w.Write([]byte("before close\n")); err != nil {
+		t.Fatalf("write before close failed: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+	if _, err := w.Write([]byte("after close\n")); err != os.ErrClosed {
+		t.Fatalf("expected os.ErrClosed after close, got: %v", err)
+	}
+}
+
+// TestWriteCons verifies cons=true also writes to stderr without error.
+func TestWriteCons(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path, true)
+	defer w.Close()
+
+	if !w.cons {
+		t.Fatalf("cons should be true")
+	}
+	if _, err := w.Write([]byte("to file and stderr\n")); err != nil {
+		t.Fatalf("write with cons failed: %v", err)
+	}
+}

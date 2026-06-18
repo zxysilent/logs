@@ -7,7 +7,7 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
-func (s *fieldLogger) Str(key, val string) *fieldLogger {
+func (s *fielder) Str(key, val string) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -15,7 +15,7 @@ func (s *fieldLogger) Str(key, val string) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Stringer(key string, val fmt.Stringer) *fieldLogger {
+func (s *fielder) Stringer(key string, val fmt.Stringer) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -28,7 +28,7 @@ func (s *fieldLogger) Stringer(key string, val fmt.Stringer) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Bytes(key string, val []byte) *fieldLogger {
+func (s *fielder) Bytes(key string, val []byte) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -36,7 +36,7 @@ func (s *fieldLogger) Bytes(key string, val []byte) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Err(err error) *fieldLogger {
+func (s *fielder) Err(err error) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -48,7 +48,7 @@ func (s *fieldLogger) Err(err error) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) IfErr(err error) *fieldLogger {
+func (s *fielder) IfErr(err error) *fielder {
 	if err == nil {
 		s.skip = true
 		return s
@@ -60,12 +60,12 @@ func (s *fieldLogger) IfErr(err error) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) If(b bool) *fieldLogger {
+func (s *fielder) If(b bool) *fielder {
 	s.skip = !b
 	return s
 }
 
-func (s *fieldLogger) Bool(key string, b bool) *fieldLogger {
+func (s *fielder) Bool(key string, b bool) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -73,7 +73,7 @@ func (s *fieldLogger) Bool(key string, b bool) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Int(key string, i int) *fieldLogger {
+func (s *fielder) Int(key string, i int) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -81,7 +81,7 @@ func (s *fieldLogger) Int(key string, i int) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Int8(key string, i int8) *fieldLogger {
+func (s *fielder) Int8(key string, i int8) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -89,7 +89,7 @@ func (s *fieldLogger) Int8(key string, i int8) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Int16(key string, i int16) *fieldLogger {
+func (s *fielder) Int16(key string, i int16) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -97,7 +97,7 @@ func (s *fieldLogger) Int16(key string, i int16) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Int32(key string, i int32) *fieldLogger {
+func (s *fielder) Int32(key string, i int32) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -105,7 +105,7 @@ func (s *fieldLogger) Int32(key string, i int32) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Int64(key string, i int64) *fieldLogger {
+func (s *fielder) Int64(key string, i int64) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -113,7 +113,7 @@ func (s *fieldLogger) Int64(key string, i int64) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Uint(key string, i uint) *fieldLogger {
+func (s *fielder) Uint(key string, i uint) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -121,7 +121,7 @@ func (s *fieldLogger) Uint(key string, i uint) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Uint8(key string, i uint8) *fieldLogger {
+func (s *fielder) Uint8(key string, i uint8) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -129,7 +129,7 @@ func (s *fieldLogger) Uint8(key string, i uint8) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Uint16(key string, i uint16) *fieldLogger {
+func (s *fielder) Uint16(key string, i uint16) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -137,7 +137,7 @@ func (s *fieldLogger) Uint16(key string, i uint16) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Uint32(key string, i uint32) *fieldLogger {
+func (s *fielder) Uint32(key string, i uint32) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -145,7 +145,7 @@ func (s *fieldLogger) Uint32(key string, i uint32) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Uint64(key string, i uint64) *fieldLogger {
+func (s *fielder) Uint64(key string, i uint64) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -153,7 +153,7 @@ func (s *fieldLogger) Uint64(key string, i uint64) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Float32(key string, f float32) *fieldLogger {
+func (s *fielder) Float32(key string, f float32) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -161,7 +161,7 @@ func (s *fieldLogger) Float32(key string, f float32) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Float64(key string, f float64) *fieldLogger {
+func (s *fielder) Float64(key string, f float64) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -169,7 +169,7 @@ func (s *fieldLogger) Float64(key string, f float64) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Time(key string, t time.Time) *fieldLogger {
+func (s *fielder) Time(key string, t time.Time) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -177,7 +177,7 @@ func (s *fieldLogger) Time(key string, t time.Time) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Dur(key string, d time.Duration) *fieldLogger {
+func (s *fielder) Dur(key string, d time.Duration) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -185,7 +185,7 @@ func (s *fieldLogger) Dur(key string, d time.Duration) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Any(key string, i any) *fieldLogger {
+func (s *fielder) Any(key string, i any) *fielder {
 	if s.attr == nil {
 		return s
 	}
@@ -193,7 +193,7 @@ func (s *fieldLogger) Any(key string, i any) *fieldLogger {
 	return s
 }
 
-func (s *fieldLogger) Raw(key string, b []byte) *fieldLogger {
+func (s *fielder) Raw(key string, b []byte) *fielder {
 	if s.attr == nil {
 		return s
 	}

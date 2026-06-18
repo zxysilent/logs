@@ -63,16 +63,15 @@ func Example_fieldError() {
 	// Output:
 }
 
-// Example: Dup duplicates a field chain for reuse; caller must call Rel after Dup.
-func Example_fieldDup() {
+// Example: Scope freezes a field chain into a reusable ScopeLogger.
+func Example_fieldScope() {
 	l := logs.New(nil)
-	base := l.With().Str("app", "myapp").Str("env", "prod")
-	defer base.Rel() // release base when done
+	base := l.With().Str("app", "myapp").Str("env", "prod").Scope()
 
-	// Dup shares existing fields; each Dup must be terminated
-	base.Dup().Int("step", 1).Info("first step")
-	base.Dup().Int("step", 2).Info("second step")
-	base.Dup().Str("status", "done").Info("final step")
+	// base is persistent; derive a one-shot fielder via With for each entry
+	base.With().Int("step", 1).Info("first step")
+	base.With().Int("step", 2).Info("second step")
+	base.With().Str("status", "done").Info("final step")
 	// Output:
 }
 

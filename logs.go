@@ -35,7 +35,7 @@ func (lv logLevel) String() string {
 
 type Logger struct {
 	out    io.Writer  // 输出
-	sep    string     // 路径分隔
+	sep    []string   // 路径分隔（取匹配位置最靠后的一个）
 	caller bool       // 调用信息
 	level  logLevel   // 日志等级
 	skip   int        //
@@ -52,7 +52,7 @@ func New(out io.Writer) *Logger {
 		caller: false,
 		level:  LINFO,
 		skip:   0,
-		sep:    "/",
+		sep:    []string{"/"},
 	}
 	n.hijackstd()
 	return n
@@ -119,7 +119,12 @@ func (l *Logger) SetCaller(b bool) {
 	l.mu.Unlock()
 }
 
-func (l *Logger) SetSep(sep string) {
+// SetSep 设置调用信息路径分隔符，可传入多个；截断时取匹配位置最靠后的那个。
+// 不传参数时保持原值不变。
+func (l *Logger) SetSep(sep ...string) {
+	if len(sep) == 0 {
+		return
+	}
 	l.mu.Lock()
 	l.sep = sep
 	l.mu.Unlock()
@@ -141,16 +146,19 @@ func (l *Logger) Write(p []byte) (int, error) {
 	return l.out.Write(p)
 }
 
-func (l *Logger) With() *fieldLogger {
+func (l *Logger) With(trace ...string) *fielder {
 	f := getfl()
 	f.logger = l
 	f.caller = l.caller
+	if len(trace) > 0 {
+		f.trace = trace[0]
+	}
 	f.attr = getb()
 	return f
 }
 
 // tracing
-func (l *Logger) Ctx(ctx context.Context) *fieldLogger {
+func (l *Logger) Ctx(ctx context.Context) *fielder {
 	f := getfl()
 	f.trace, _ = ctx.Value(traceKey).(string)
 	f.logger = l

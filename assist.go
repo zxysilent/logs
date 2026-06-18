@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +14,25 @@ const (
 	callerBaseSkip = 2
 	writeExtraSkip = 2
 )
+
+// lastSep 返回 file 中任一分隔符最靠后的匹配下标，无匹配返回 -1。
+// 采用从右向左单次扫描 + 首字节剪枝：仅当当前字节等于某个分隔符首字节时才做整串比较，
+// 命中即返回（最靠后）。相比对每个分隔符各做一次全串查找，在多个多字符分隔符
+// （如 "/internal"、"/src"）场景下更快且零分配。
+func lastSep(file string, seps []string) int {
+	for i := len(file) - 1; i >= 0; i-- {
+		c := file[i]
+		for _, sep := range seps {
+			if len(sep) == 0 || sep[0] != c {
+				continue
+			}
+			if i+len(sep) <= len(file) && file[i:i+len(sep)] == sep {
+				return i
+			}
+		}
+	}
+	return -1
+}
 
 func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
 	buf := getb()
@@ -31,12 +49,14 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 			file = "###"
 			line = 0
 		} else {
-			slash := strings.LastIndex(file, log.sep)
+			slash := lastSep(file, log.sep)
 			if slash >= 0 {
 				file = file[slash:]
 			}
 		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
+		*buf = append(*buf, ':')
+		*buf = strconv.AppendInt(*buf, int64(line), 10)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -104,12 +124,14 @@ func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, f
 			file = "###"
 			line = 0
 		} else {
-			slash := strings.LastIndex(file, log.sep)
+			slash := lastSep(file, log.sep)
 			if slash >= 0 {
 				file = file[slash:]
 			}
 		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
+		*buf = append(*buf, ':')
+		*buf = strconv.AppendInt(*buf, int64(line), 10)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -140,12 +162,14 @@ func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, m
 			file = "###"
 			line = 0
 		} else {
-			slash := strings.LastIndex(file, log.sep)
+			slash := lastSep(file, log.sep)
 			if slash >= 0 {
 				file = file[slash:]
 			}
 		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file+":"+strconv.Itoa(line))
+		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
+		*buf = append(*buf, ':')
+		*buf = strconv.AppendInt(*buf, int64(line), 10)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -187,13 +211,13 @@ func putb(b *buffer) {
 	}
 }
 
-var fpool = sync.Pool{New: func() any { return &fieldLogger{} }}
+var fpool = sync.Pool{New: func() any { return &fielder{} }}
 
-func getfl() *fieldLogger {
-	return fpool.Get().(*fieldLogger)
+func getfl() *fielder {
+	return fpool.Get().(*fielder)
 }
 
-func putfl(fl *fieldLogger) {
+func putfl(fl *fielder) {
 	if fl == nil {
 		return
 	}

@@ -107,6 +107,55 @@ func TestConfig(t *testing.T) {
 	l.Ctx(ctx).Errorf("%s", "Errorf")
 }
 
+// TestLastSep verifies multi-separator truncation picks the right-most match.
+func TestLastSep(t *testing.T) {
+	seps := []string{"/", "\\"}
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"a/b/c.go", 3},   // last '/'
+		{"a\\b\\c.go", 3}, // last '\'
+		{"a/b\\c.go", 3},  // mixed: last is '\'
+		{"a\\b/c.go", 3},  // mixed: last is '/'
+		{"nosep.go", -1},  // no separator
+	}
+	for _, c := range cases {
+		if got := lastSep(c.in, seps); got != c.want {
+			t.Fatalf("lastSep(%q)=%d, want %d", c.in, got, c.want)
+		}
+	}
+	// empty seps in the list are ignored
+	if got := lastSep("a/b", []string{"", "/"}); got != 1 {
+		t.Fatalf("lastSep with empty sep mismatch: %d", got)
+	}
+}
+
+// TestSetSepMulti verifies SetSep accepts multiple separators and SetSep() with no args keeps the value.
+func TestSetSepMulti(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	l.SetSep("/", "\\")
+
+	buf.Reset()
+	l.Info("multi-sep")
+	got := buf.String()
+	// caller should be truncated to the file segment (starts with a separator)
+	if !strings.Contains(got, "caller=") {
+		t.Fatalf("caller field missing: %s", got)
+	}
+
+	// SetSep() with no args must keep existing separators
+	l.SetSep()
+	buf.Reset()
+	l.Info("still-works")
+	if got := buf.String(); !strings.Contains(got, "caller=") {
+		t.Fatalf("caller field missing after SetSep(): %s", got)
+	}
+}
+
 func TestConfigWithFile(t *testing.T) {
 	l := New(os.Stdout)
 	l.SetFile("./logs/app.log")
@@ -248,10 +297,10 @@ func TestLog1(t *testing.T) {
 	// l.SetFile("./logs1/app.log")
 	defer l.Close()
 	ctx := TraceCtx(context.Background(), trace())
-	l1 := l.Ctx(ctx).Str("basic", "basic")
-	l1.Dup().Debug()
-	l1.Dup().Info()
-	l1.Dup().Error()
+	l1 := l.Ctx(ctx).Str("basic", "basic").Scope()
+	l1.Debug()
+	l1.Info()
+	l1.Error()
 	s := l.Ctx(ctx)
 	s.Bool("b", false)
 	s.Info("666")
@@ -284,10 +333,9 @@ func TestSpan(t *testing.T) {
 	SetCons(true)
 	SetCaller(true)
 	ctx := TraceCtx(context.Background())
-	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
-	defer n.Rel()
-	n.Dup().Str("b", "b").Info("xx")
-	n.Dup().Str("c", "c").Info("xx")
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Scope()
+	n.With().Str("b", "b").Info("xx")
+	n.With().Str("c", "c").Info("xx")
 }
 
 // TestCallerCorrect verifies caller points to the actual call site, not internal helper.
@@ -560,11 +608,11 @@ func TestCallerLineFieldError(t *testing.T) {
 // TestCallerLineNsInfo verifies caller line number for NsLogger.Info.
 func TestCallerLineNsInfo(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Info("ns-info-line")
 	got := buf.String()
@@ -572,7 +620,7 @@ func TestCallerLineNsInfo(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger Info caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/ns.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -580,11 +628,11 @@ func TestCallerLineNsInfo(t *testing.T) {
 // TestCallerLineNsDebug verifies caller line number for NsLogger.Debug.
 func TestCallerLineNsDebug(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LDEBUG)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LDEBUG)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Debug("ns-debug-line")
 	got := buf.String()
@@ -592,7 +640,7 @@ func TestCallerLineNsDebug(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger Debug caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/ns.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -600,11 +648,11 @@ func TestCallerLineNsDebug(t *testing.T) {
 // TestCallerLineNsWarn verifies caller line number for NsLogger.Warn.
 func TestCallerLineNsWarn(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LWARN)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LWARN)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Warn("ns-warn-line")
 	got := buf.String()
@@ -612,7 +660,7 @@ func TestCallerLineNsWarn(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger Warn caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/ns.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -620,11 +668,11 @@ func TestCallerLineNsWarn(t *testing.T) {
 // TestCallerLineNsError verifies caller line number for NsLogger.Error.
 func TestCallerLineNsError(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LERROR)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LERROR)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Error("ns-error-line")
 	got := buf.String()
@@ -632,7 +680,7 @@ func TestCallerLineNsError(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger Error caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/ns.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -640,11 +688,11 @@ func TestCallerLineNsError(t *testing.T) {
 // TestCallerLineNsWith verifies caller line number for NsLogger.With().
 func TestCallerLineNsWith(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Str("k", "v").Info("ns-with-line")
 	got := buf.String()
@@ -652,7 +700,7 @@ func TestCallerLineNsWith(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger With caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/ns.go") {
+	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/scope.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -660,11 +708,11 @@ func TestCallerLineNsWith(t *testing.T) {
 // TestCallerLineNsCtx verifies caller line number for NsLogger.Ctx().
 func TestCallerLineNsCtx(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 	ctx := TraceCtx(context.Background(), "req-1")
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Ctx(ctx).Info("ns-ctx-line")
@@ -673,7 +721,7 @@ func TestCallerLineNsCtx(t *testing.T) {
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("NsLogger Ctx caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/ns.go") {
+	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/scope.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -809,7 +857,7 @@ func TestIfErrConditionalMultiLevel(t *testing.T) {
 
 	s := l.With().IfErr(nil)
 	s.Info("no")
-	// Note: s.Rel() not needed — s.Info() already calls putfl internally
+	// Note: s.Info() already calls putfl internally
 
 	l.With().IfErr(errors.New("err1")).IfErr(errors.New("err2")).Errorf("multi-err")
 	got := buf.String()
@@ -821,73 +869,63 @@ func TestIfErrConditionalMultiLevel(t *testing.T) {
 	}
 }
 
-// TestDupRel verifies Dup copies fields and Rel releases without panic.
-func TestDupRel(t *testing.T) {
+// TestScoper verifies Scope freezes fields into a reusable, concurrency-safe logger.
+func TestScoper(t *testing.T) {
 	l := New(io.Discard)
 	l.SetCaller(false)
 	l.SetLevel(LINFO)
 
-	s := l.With().Str("shared", "val")
-	d1 := s.Dup().Str("d1", "a")
-	d2 := s.Dup().Str("d2", "b")
-
-	d1.Info("dup1")
-	d2.Info("dup2")
-	// Note: s is released by Info() which calls putfl internally.
+	s := l.With().Str("shared", "val").Scope()
+	s.With().Str("d1", "a").Info("entry1")
+	s.With().Str("d2", "b").Info("entry2")
+	// s is persistent and reusable; no manual release needed.
 	s.Info("parent")
-	// Test passes if no panic — Dup/Rel lifecycle is correct.
 }
 
-// TestRelNil verifies Rel(nil) doesn't panic.
-func TestRelNil(t *testing.T) {
-	var fl *fieldLogger
-	fl.Rel() // should not panic
-}
-
-// TestFieldLoggerPrint verifies fieldLogger Print/Println/Printf with fields.
+// TestFieldLoggerPrint verifies fielder Info/Infof with fields.
 func TestFieldLoggerPrint(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
 	l.SetCaller(false)
 	l.SetLevel(LINFO)
 
-	l.With().Str("k", "v").Print("p1", "p2")
+	l.With().Str("k", "v").Info("p1", "p2")
 	got := buf.String()
 	if !strings.Contains(got, `k=v`) {
-		t.Fatalf("fieldLogger.Print k=v missing: %s", got)
+		t.Fatalf("fielder.Info k=v missing: %s", got)
 	}
 	if !strings.Contains(got, `p1p2`) {
-		t.Fatalf("fieldLogger.Print msg mismatch: %s", got)
+		t.Fatalf("fielder.Info msg mismatch: %s", got)
 	}
 
 	buf.Reset()
-	l.With().Int("n", 1).Println("pl")
+	l.With().Int("n", 1).Info("pl")
 	got = buf.String()
 	if !strings.Contains(got, `n=1`) {
-		t.Fatalf("fieldLogger.Println n=1 missing: %s", got)
+		t.Fatalf("fielder.Info n=1 missing: %s", got)
 	}
 
 	buf.Reset()
-	l.With().Str("k", "v").Printf("%s:%d", "a", 1)
+	l.With().Str("k", "v").Infof("%s:%d", "a", 1)
 	got = buf.String()
 	if !strings.Contains(got, `k=v`) {
-		t.Fatalf("fieldLogger.Printf k=v missing: %s", got)
+		t.Fatalf("fielder.Infof k=v missing: %s", got)
 	}
 	if !strings.Contains(got, `a:1`) {
-		t.Fatalf("fieldLogger.Printf msg mismatch: %s", got)
+		t.Fatalf("fielder.Infof msg mismatch: %s", got)
 	}
 }
 
-// TestFieldLoggerPrintSkip verifies If(false) + Print skips output.
+// TestFieldLoggerPrintSkip verifies If(false) + Info skips output.
 func TestFieldLoggerPrintSkip(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
 	l.SetCaller(false)
 	l.SetLevel(LINFO)
 
-	l.With().If(false).Print("should-not-appear")
+	l.With().If(false).Info("should-not-appear")
 	if got := buf.String(); got != "" {
-		t.Fatalf("If(false).Print should be filtered: %s", got)
+		t.Fatalf("If(false).Info should be filtered: %s", got)
 	}
 }
 
@@ -895,9 +933,9 @@ func TestFieldLoggerPrintSkip(t *testing.T) {
 func TestNsLoggerFormatted(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("svc")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LDEBUG)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LDEBUG)
 
 	l.Debugf("debug %s", "test")
 	if got := buf.String(); !strings.Contains(got, "trace=svc") || !strings.Contains(got, "debug test") {
@@ -996,13 +1034,19 @@ func TestFieldLoggerEmptyArgs(t *testing.T) {
 
 // TestFieldLoggerNilAttr verifies field methods with nil attr don't panic.
 func TestFieldLoggerNilAttr(t *testing.T) {
-	fl := &fieldLogger{}
-	fl.Str("k", "v")
-	fl.Int("k", 1)
-	fl.Bool("k", true)
-	fl.Err(errors.New("e"))
-	fl.IfErr(errors.New("e"))
-	// Should not panic
+	fl := &fielder{} // attr == nil
+	fl.Str("k", "v").
+		Stringer("k", nil).
+		Bytes("k", []byte("v")).
+		Bool("k", true).
+		Int("k", 1).Int8("k", 1).Int16("k", 1).Int32("k", 1).Int64("k", 1).
+		Uint("k", 1).Uint8("k", 1).Uint16("k", 1).Uint32("k", 1).Uint64("k", 1).
+		Float32("k", 1).Float64("k", 1).
+		Time("k", time.Now()).Dur("k", time.Second).
+		Any("k", "v").Raw("k", []byte("v")).
+		Err(errors.New("e")).IfErr(errors.New("e")).
+		If(true)
+	// Should not panic; every setter must safely early-return on nil attr.
 }
 
 // TestStdWriterNilReceiver verifies nil stdWriter.Write doesn't panic.
@@ -1072,6 +1116,112 @@ func TestLoggerClose(t *testing.T) {
 	l := New(io.Discard)
 	if err := l.Close(); err != nil {
 		t.Fatalf("Close error: %v", err)
+	}
+}
+
+// TestSetConsNoFile verifies SetCons on a logger with no file writer returns early without panic.
+func TestSetConsNoFile(t *testing.T) {
+	l := New(io.Discard) // no SetFile → fw == nil
+	l.SetCons(true)       // should not panic, fw==nil branch
+}
+
+// TestWithTrace verifies Logger.With(trace) sets the trace on the fielder.
+func TestWithTrace(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(false)
+	l.SetLevel(LINFO)
+	l.With("req-abc").Str("k", "v").Info("msg")
+	if got := buf.String(); !strings.Contains(got, "trace=req-abc") {
+		t.Fatalf("With(trace) did not set trace: %s", got)
+	}
+}
+
+// TestPutflNil verifies putfl(nil) does not panic.
+func TestPutflNil(t *testing.T) {
+	putfl(nil) // nil branch
+}
+
+// TestPrintbCallerRuntimeFail covers the printb !ok branch (file="###") via stdWriter.
+func TestPrintbCallerRuntimeFail(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	l.SetSkip(9999) // far beyond stack depth → runtime.Caller returns !ok inside printb
+	w := l.stdWriter("ns")
+	w.Write([]byte("deep-skip-printb\n"))
+	if got := buf.String(); !strings.Contains(got, "###") {
+		t.Fatalf("expected caller=### in printb !ok branch, got: %s", got)
+	}
+}
+
+// TestPrintbCallerAndAttr verifies printb with caller=true and a non-nil attr.
+func TestPrintbCallerAndAttr(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	// Use stdWriter which calls printb internally.
+	w := l.stdWriter("ns")
+	w.Write([]byte("hello from printb\n"))
+	if got := buf.String(); !strings.Contains(got, "caller=") {
+		t.Fatalf("printb with caller should emit caller field: %s", got)
+	}
+}
+
+// TestPrintbEmptyMsg verifies printb with empty msg emits no msg field.
+func TestPrintbEmptyMsg(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(false)
+	l.SetLevel(LINFO)
+	printb("", LINFO, false, l, nil, []byte{})
+	if got := buf.String(); strings.Contains(got, "msg=") {
+		t.Fatalf("printb with empty msg should not emit msg field: %s", got)
+	}
+}
+
+// TestPrintbWithAttr verifies printb with a non-nil attr buffer appends fields.
+func TestPrintbWithAttr(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(false)
+	l.SetLevel(LINFO)
+	attr := getb()
+	*attr = append(*attr, []byte("key=val")...)
+	printb("", LINFO, false, l, attr, []byte("hi"))
+	putb(attr)
+	if got := buf.String(); !strings.Contains(got, "key=val") {
+		t.Fatalf("printb with attr should include field: %s", got)
+	}
+}
+
+// TestCallerRuntimeFail simulates runtime.Caller failure by using a very large skip.
+// The !ok branch sets file="###" and line=0.
+func TestCallerRuntimeFail(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	l.SetSkip(9999) // skip far beyond actual stack depth → runtime.Caller returns !ok
+	l.Info("deep-skip")
+	got := buf.String()
+	if !strings.Contains(got, "###") {
+		t.Fatalf("expected caller=### when runtime.Caller fails, got: %s", got)
+	}
+}
+
+// TestPrintfCallerRuntimeFail covers the printf !ok branch.
+func TestPrintfCallerRuntimeFail(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.SetCaller(true)
+	l.SetLevel(LINFO)
+	l.SetSkip(9999)
+	l.Infof("deep-skip-f %d", 1)
+	if got := buf.String(); !strings.Contains(got, "###") {
+		t.Fatalf("expected caller=### in printf !ok branch, got: %s", got)
 	}
 }
 
@@ -1150,13 +1300,12 @@ func BenchmarkParallelSpan(b *testing.B) {
 	SetOutput(io.Discard)
 	SetCaller(false)
 	ctx := TraceCtx(context.Background())
-	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub")
-	defer n.Rel()
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Scope()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			n.Dup().Str("b", "b").Info("xx")
-			n.Dup().Str("c", "c").Info("xx")
+			n.With().Str("b", "b").Info("xx")
+			n.With().Str("c", "c").Info("xx")
 		}
 	})
 }
@@ -1434,9 +1583,9 @@ func TestPrintSpecialChars(t *testing.T) {
 func TestNsSingleArgTypes(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 
 	l.Info("hello")
 	got := buf.String()
@@ -1537,9 +1686,9 @@ func FuzzNsInfo(f *testing.F) {
 	f.Add(strings.Repeat("x", 512), "msg")
 	f.Fuzz(func(t *testing.T, ns, msg string) {
 		l := Ns(ns)
-		l.lg.SetOutput(io.Discard)
-		l.lg.SetCaller(false)
-		l.lg.SetLevel(LINFO)
+		l.logger.SetOutput(io.Discard)
+		l.logger.SetCaller(false)
+		l.logger.SetLevel(LINFO)
 		l.Info(msg)
 		l.Info(msg, 42)
 	})
@@ -1558,3 +1707,63 @@ func FuzzNsInfo(f *testing.F) {
 // go tool pprof -http="127.0.0.1:8080" cpu_profile.out
 // go test -benchmem -run=^$ -bench ^BenchmarkZerologJSONPositive1$ github.com/zxysilent/logs -count=1 -v -benchtime=3s -cpuprofile=cpu_profile.out1
 // go tool pprof -http="127.0.0.1:8080" cpu_profile.out1
+
+// refLastSep is a trivially-correct reference: max of LastIndex over all separators.
+func refLastSep(file string, seps []string) int {
+	max := -1
+	for _, sep := range seps {
+		if sep == "" {
+			continue
+		}
+		if idx := strings.LastIndex(file, sep); idx > max {
+			max = idx
+		}
+	}
+	return max
+}
+
+// TestLastSepMulti verifies lastSep matches the reference implementation across
+// multi-char separators (real-world /xxx scenario), same-first-byte seps, and edge cases.
+func TestLastSepMulti(t *testing.T) {
+	sepSets := [][]string{
+		{"/internal", "/src", "/"},
+		{"/zxysilent", "/schci"},      // multi-char, same first byte '/'
+		{"/zxysilent", "/schci", "/"}, // mixed with single '/'
+		{"zxysilent", "schci"},        // no leading sep char
+		{"", "/"},                     // empty sep ignored
+	}
+	files := []string{
+		"/home/user/go/src/github.com/zxysilent/logs/internal/file/witer.go",
+		"/home/user/src/main.go",
+		"relative/path/file.go",
+		"github.com/zxysilent/logs/internal/x.go",
+		"/root/zxysilent/app/schci/main.go", // both multi-char seps present
+		"/only/schci/here.go",
+		"/zxysilent",
+		"prefix/zxysilenter/file.go", // sep is a prefix of a longer word
+		"nosep",
+		"",
+		"/",
+		"a/b",
+	}
+	for _, seps := range sepSets {
+		for _, f := range files {
+			if got, want := lastSep(f, seps), refLastSep(f, seps); got != want {
+				t.Fatalf("lastSep(%q, %v)=%d, want %d", f, seps, got, want)
+			}
+		}
+	}
+}
+
+// BenchmarkLastSep measures multi-string separator lookup (real-world /xxx scenario).
+var (
+	benchPath = "/home/user/go/src/github.com/zxysilent/logs/internal/file/witer.go"
+	benchSeps = []string{"/internal", "/src", "/"}
+	benchSink int
+)
+
+func BenchmarkLastSep(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		benchSink = lastSep(benchPath, benchSeps)
+	}
+}

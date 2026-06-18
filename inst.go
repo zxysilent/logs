@@ -12,9 +12,12 @@ func SetLevel(lv logLevel) {
 	log.SetLevel(lv)
 }
 
-// SetSep 设置调用信息分隔符
-func SetSep(sep string) {
-	log.SetSep(sep)
+// SetSep 设置调用信息(caller)路径分隔符，可传入多个。
+// 输出 caller 时按这些分隔符截断文件路径，取最靠后的匹配段（保留分隔符本身），
+// 例如 SetSep("/internal", "/src") 会把绝对路径截到对应模块段。
+// 不传参数时保持当前配置不变。
+func SetSep(sep ...string) {
+	log.SetSep(sep...)
 }
 
 // SetCaller
@@ -99,11 +102,11 @@ func Printf(format string, args ...any) {
 }
 
 // With 字段日志
-func With() *fieldLogger {
-	return log.With()
+func With(trace ...string) *fielder {
+	return log.With(trace...)
 }
 
-func Ctx(ctx context.Context) *fieldLogger {
+func Ctx(ctx context.Context) *fielder {
 	return log.Ctx(ctx)
 }
 
@@ -133,6 +136,11 @@ func SetCons(b bool) {
 }
 
 // Ns 命名空间日志
-func Ns(ns string) *NsLogger {
-	return &NsLogger{lg: log, ns: ns}
+func Ns(ns string) *Scoper {
+	return log.Ns(ns)
+}
+
+// Scope 空作用域日志
+func Scope() *Scoper {
+	return log.Scope()
 }

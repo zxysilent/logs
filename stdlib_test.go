@@ -60,9 +60,9 @@ func TestPackagePrintCompat(t *testing.T) {
 func TestNsRootTrace(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 	l.Info("hello")
 	got := buf.String()
 	if !strings.Contains(got, "trace=myapp") {
@@ -73,9 +73,9 @@ func TestNsRootTrace(t *testing.T) {
 func TestNsSubTrace(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 	ctx := TraceCtx(context.Background(), "req-1")
 	l.Ctx(ctx).Info("sub")
 	got := buf.String()
@@ -87,9 +87,9 @@ func TestNsSubTrace(t *testing.T) {
 func TestNsEmptyCtx(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 	l.Ctx(context.Background()).Info("x")
 	got := buf.String()
 	if !strings.Contains(got, "trace=myapp") {
@@ -103,9 +103,9 @@ func TestNsEmptyCtx(t *testing.T) {
 func TestNsWithFields(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("svc")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 	l.With().Str("k", "v").Info("x")
 	got := buf.String()
 	if !strings.Contains(got, "trace=svc") {
@@ -116,9 +116,9 @@ func TestNsWithFields(t *testing.T) {
 func TestNsLevelFilter(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("svc")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LWARN)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LWARN)
 	l.Info("no")
 	l.Warn("yes")
 	got := buf.String()
@@ -133,9 +133,9 @@ func TestNsLevelFilter(t *testing.T) {
 func TestNsPrint(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("api")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(false)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(false)
+	l.logger.SetLevel(LINFO)
 	l.Print("a", "b")
 	got := buf.String()
 	if !strings.Contains(got, "trace=api") {
@@ -195,11 +195,11 @@ func TestStdWriterLevelFilter(t *testing.T) {
 
 func TestNsCallerLine(t *testing.T) {
 	var buf bytes.Buffer
+	log.SetCaller(true)
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 
 	l.Info("caller-line")
 	got := buf.String()
@@ -218,10 +218,10 @@ func TestNsCallerLine(t *testing.T) {
 func TestNsCallerWith(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(true)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 
 	l.With().Str("k", "v").Info("caller-with")
 	got := buf.String()
@@ -239,10 +239,10 @@ func TestNsCallerWith(t *testing.T) {
 func TestNsCallerCtx(t *testing.T) {
 	var buf bytes.Buffer
 	l := Ns("myapp")
-	l.lg.SetOutput(&buf)
-	l.lg.SetCaller(true)
-	l.lg.SetSkip(0)
-	l.lg.SetLevel(LINFO)
+	l.logger.SetOutput(&buf)
+	l.logger.SetCaller(true)
+	l.logger.SetSkip(0)
+	l.logger.SetLevel(LINFO)
 
 	ctx := TraceCtx(context.Background(), "req-1")
 	l.Ctx(ctx).Info("caller-ctx")

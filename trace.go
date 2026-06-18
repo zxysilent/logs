@@ -35,7 +35,9 @@ func TraceOf(ctx context.Context) string {
 //go:linkname fastrand runtime.fastrand64
 func fastrand() uint64
 
-const traceKey = "zlogs-trace-key"
+type ctxKey struct{}
+
+var traceKey = ctxKey{}
 
 // TraceCtx 处理traceid并返回新的context
 // 1. ctx存在traceid，traceid参数不存在/为空 → 复用原有traceid

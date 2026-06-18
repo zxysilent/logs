@@ -85,7 +85,7 @@ func main() {
 ```go
 logs.SetLevel(lv logLevel)                          // set log level
 logs.SetCaller(b bool)                              // enable/disable caller line
-logs.SetSep(sep string)                             // path separator, default "/"
+logs.SetSep(sep ...string)                          // path separators, default "/" (right-most match wins)
 logs.SetSkip(skip int)                              // extra caller skip frames
 logs.SetOutput(out io.Writer)                       // set output writer
 logs.SetFile(path string)                           // set file output
@@ -110,11 +110,11 @@ logs.Println(args ...any)
 logs.Printf(format string, args ...any)
 
 // Field chain / tracing
-logs.With() *fieldLogger
-logs.Ctx(ctx context.Context) *fieldLogger
+logs.With(trace ...string) *fielder
+logs.Ctx(ctx context.Context) *fielder
 
 // Namespace
-logs.Ns(ns string) *NsLogger
+logs.Ns(ns string) *ScopeLogger
 ```
 
 ### Logger (custom instance)
@@ -128,23 +128,29 @@ l.SetCons(b)    l.Close()
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
 l.Warn(...)   l.Warnf(...)   l.Error(...) l.Errorf(...)
 l.Print(...)  l.Println(...) l.Printf(...)
-l.With() *fieldLogger   l.Ctx(ctx) *fieldLogger
+l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
+l.Ns(ns string) *ScopeLogger
 l.Writer() io.Writer     // returns an io.Writer, writes logfmt
 ```
 
-### NsLogger (namespaced logger)
+### ScopeLogger (reusable namespace / field scope)
 
 ```go
-api := logs.Ns("api")
+api := logs.Ns("api")            // *ScopeLogger, trace=api
 api.Debug(...)  api.Debugf(...)  api.Info(...)  api.Infof(...)
 api.Warn(...)   api.Warnf(...)   api.Error(...) api.Errorf(...)
 api.Print(...)  api.Println(...) api.Printf(...)
-api.With() *fieldLogger
-api.Ctx(ctx context.Context) *fieldLogger
+api.With() *fielder              // derive a one-shot fielder, inherits attr+trace
+api.Ctx(ctx context.Context) *fielder
 // trace = ns (no ctx) or ns.trace (with ctx)
+
+// Freeze a field chain into a persistent, reusable, concurrency-safe ScopeLogger:
+base := logs.With().Str("svc", "api").Int("pid", 1).Scope() // *ScopeLogger
+base.Info("started")             // svc=api pid=1, not released, reusable
+base.With().Int("uid", 9).Info("login")
 ```
 
-### fieldLogger (structured fields + output control)
+### fielder (structured fields + output control)
 
 ```go
 // Fields
@@ -163,16 +169,14 @@ fl.Any(key string, i any)        fl.Raw(key string, b []byte)
 fl.If(b bool)                    // conditional output
 fl.Caller(b bool)                // per-entry caller control
 
-// Dup/Rel
-fl.Dup() *fieldLogger            // duplicate field chain for reuse
-fl.Rel()                         // release
+// Freeze into a reusable ScopeLogger
+fl.Scope() *ScopeLogger               // persist field chain (no manual release)
 
-// Terminal methods (fieldLogger is recycled after call)
+// Terminal methods (fielder is recycled after call)
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
 fl.Info(args ...any)    fl.Infof(format string, args ...any)
 fl.Warn(args ...any)    fl.Warnf(format string, args ...any)
 fl.Error(args ...any)   fl.Errorf(format string, args ...any)
-fl.Print(args ...any)   fl.Println(args ...any)   fl.Printf(format string, args ...any)
 ```
 
 ### Distributed Tracing
