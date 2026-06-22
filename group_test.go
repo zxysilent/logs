@@ -102,6 +102,43 @@ func TestLoggerTrace(t *testing.T) {
 	}
 }
 
+// TestTraceReplaceCloneAppend verifies Trace replaces the namespace while
+// Clone(trace) appends to it (and Clone() with no args is a pure copy).
+func TestTraceReplaceCloneAppend(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
+
+	// Trace replaces: api -> svc (not api.svc)
+	buf.Reset()
+	l.Trace("api").Trace("svc").Info("x")
+	if got := buf.String(); !strings.Contains(got, "trace=svc") || strings.Contains(got, "trace=api.svc") {
+		t.Fatalf("Trace should replace, expected trace=svc, got: %s", got)
+	}
+
+	// Clone(trace) appends: api -> api.pay
+	buf.Reset()
+	l.Trace("api").Clone("pay").Info("x")
+	if got := buf.String(); !strings.Contains(got, "trace=api.pay") {
+		t.Fatalf("Clone(trace) should append, expected trace=api.pay, got: %s", got)
+	}
+
+	// Clone() with no args is a pure copy: keeps api
+	buf.Reset()
+	l.Trace("api").Clone().Info("x")
+	if got := buf.String(); !strings.Contains(got, "trace=api") {
+		t.Fatalf("Clone() should preserve trace, expected trace=api, got: %s", got)
+	}
+
+	// Clone(trace) on empty namespace -> just the trace
+	buf.Reset()
+	l.Clone("only").Info("x")
+	if got := buf.String(); !strings.Contains(got, "trace=only") {
+		t.Fatalf("Clone(trace) on empty ns, expected trace=only, got: %s", got)
+	}
+}
+
 // TestGroupWithTraceJoin verifies With(trace) joins with the logger namespace.
 func TestGroupWithTraceJoin(t *testing.T) {
 	var buf bytes.Buffer

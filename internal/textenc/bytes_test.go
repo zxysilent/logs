@@ -60,6 +60,7 @@ func TestPutBytesQuote(t *testing.T) {
 		{"\thello", `"\thello"`},
 		{"hello\tworld", `"hello\tworld"`},
 		{"a b\tc", `"a b\tc"`},
+		{`a"b c`, `"a\"b c"`}, // space after escape — needQuote must not be missed
 		{"hello", `hello`},
 		{"hello\nworld", `hello\nworld`},
 	}

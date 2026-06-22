@@ -6,7 +6,6 @@ import (
 	stdlog "log"
 )
 
-// hijackstd 劫持标准库 log 输出，将其重定向到本库的日志系统。
 // hijackstd hijacks standard library log output and redirects it to this library's logging system.
 func (l *Logger) hijackstd() {
 	stdlog.SetFlags(0)

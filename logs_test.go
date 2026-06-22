@@ -16,6 +16,21 @@ import (
 	"time"
 )
 
+func TestCallerSkip(t *testing.T) {
+	SetCaller(true)
+	SetTrace("root")
+	Info("01")
+	Trace("t").Info("0101")
+	l := New(os.Stderr, WithCaller(true))
+	l.Info("02")
+	lc := l.Clone()
+	lc.Info("0202")
+	la := lc.With("t1").Str("k", "v").Group()
+	la.Info("03")
+	la.Clone("t3").Clone("t4").Info("04") // append: t1.t3.t4
+	la.Trace("t5").Info("05")             // replace: t5
+}
+
 func TestPrintCompat(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)

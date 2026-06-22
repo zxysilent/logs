@@ -47,7 +47,7 @@ func TestConfigSharedAcrossTrace(t *testing.T) {
 	var buf bytes.Buffer
 	root := New(&buf, WithLevel(LINFO))
 	api := root.Trace("api")
-	pay := api.Trace("pay")
+	pay := api.Clone("pay") // Clone appends -> api.pay
 
 	// Mutate the shared config via the root's cfg.
 	root.cfg.setLevel(LWARN)

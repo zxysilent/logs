@@ -294,6 +294,14 @@ func TestPutStringQuoteEscapeNoSpace(t *testing.T) {
 		{`a\b`, `a\\b`},
 		{"plain", "plain"},
 		{"with space", `"with space"`},
+		// escape char BEFORE space: must still wrap in quotes (single-pass re-scan).
+		{"a\"b c", `"a\"b c"`},
+		{"a\nb c", `"a\nb c"`},
+		// tab is both an escape char and a quote trigger.
+		{"a\tb", `"a\tb"`},
+		{"\t", `"\t"`},
+		// space BEFORE escape char: quote set by main loop before hitting escape.
+		{"a b\"c", `"a b\"c"`},
 	}
 	for _, tt := range tests {
 		if got := string(PutStringQuote(nil, tt.in)); got != tt.want {

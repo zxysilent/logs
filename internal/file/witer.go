@@ -14,23 +14,23 @@ import (
 
 const (
 	sizeMiB    = 1024 * 1024
-	defMaxage  = 64 //天
-	defMaxsize = 64 //MiB
+	defMaxage  = 64 // days
+	defMaxsize = 64 // MiB
 )
 
 var _ io.WriteCloser = (*Writer)(nil)
 
 type Writer struct {
-	maxage  int       // 最大保留天数
-	maxsize int64     // 单个日志最大容量 默认 64MB
-	console bool      // 标准输出  默认false
-	size    int64     // 累计大小
-	fpath   string    // 完整路径 fpath=fdir+fname+fsuffix
-	fdir    string    // 文件目录
-	fname   string    // 文件名
-	fsuffix string    // 文件后缀名 默认 .log
-	created time.Time // 文件创建日期
-	creates []byte    // 文件创建日期 for compare
+	maxage  int       // max retention days
+	maxsize int64     // max size per file, default 64 MiB
+	console bool      // mirror to stderr
+	size    int64     // accumulated size
+	fpath   string    // full path fpath=fdir+fname+fsuffix
+	fdir    string    // directory
+	fname   string    // filename
+	fsuffix string    // suffix, default .log
+	created time.Time // file creation date
+	creates []byte    // file creation date for compare
 	file    *os.File
 	bw      *bufio.Writer
 	tk      *time.Ticker
@@ -71,14 +71,14 @@ func (w *Writer) daemon() {
 	}
 }
 
-// SetMaxAge 最大保留天数
+// SetMaxAge sets the max retention days.
 func (w *Writer) SetMaxAge(ma int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.maxage = ma
 }
 
-// SetMaxSize 单个日志最大容量MiB
+// SetMaxSize sets the max size of a single log file in MiB.
 func (w *Writer) SetMaxSize(ms int64) {
 	if ms < 1 {
 		return
@@ -88,7 +88,7 @@ func (w *Writer) SetMaxSize(ms int64) {
 	w.maxsize = ms * sizeMiB
 }
 
-// SetConsole 同时输出控制台
+// SetConsole sets whether to also output to stderr.
 func (w *Writer) SetConsole(b bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -118,14 +118,14 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 			return 0, err
 		}
 	}
-	// 按天切割
+	// rotate by day
 	if !w.equaldate(w.creates, p) { //2023-04-05
-		go w.delete(w.maxage) // 每天检测一次旧文件
+		go w.delete(w.maxage) // daily cleanup
 		if err := w.rotate(); err != nil {
 			return 0, err
 		}
 	}
-	// 按大小切割
+	// rotate by size
 	if w.size+int64(len(p)) >= w.maxsize {
 		if err := w.rotate(); err != nil {
 			return 0, err
@@ -140,14 +140,14 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return
 }
 
-// rotate 切割文件
+// rotate closes the current file and opens a new one.
 func (w *Writer) rotate() error {
 	now := time.Now()
 	if w.file != nil {
 		w.bw.Flush()
 		w.file.Sync()
 		w.file.Close()
-		// 保存
+		// save backup
 		fbak := w.fname + w.time2name(w.created) + w.fsuffix
 		os.Rename(w.fpath, filepath.Join(w.fdir, fbak))
 		w.size = 0
@@ -168,7 +168,7 @@ func (w *Writer) rotate() error {
 	return nil
 }
 
-// 删除旧日志
+// delete removes log files older than maxage days.
 func (w *Writer) delete(maxage int) {
 	if maxage <= 0 {
 		return
@@ -185,7 +185,7 @@ func (w *Writer) delete(maxage int) {
 			continue
 		}
 		t, err := w.name2time(name)
-		// 只删除满足格式的文件
+		// only delete files matching the date pattern
 		if err == nil && t.Before(fakeNow) {
 			os.Remove(filepath.Join(dir, name))
 		}

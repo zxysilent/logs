@@ -2,7 +2,6 @@ package textenc
 
 import (
 	"fmt"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -29,31 +28,44 @@ func PutStringQuote(dst []byte, s string) []byte {
 }
 
 func quoteString(dst []byte, s string, quote bool) []byte {
-	quote = quote && strings.ContainsAny(s, "\t ")
-	if quote {
+	// Single pass: find the first byte that needs escaping while tracking
+	// whether the string contains a space/tab (which forces quoting).
+	// Most keys/values are clean ASCII, so this returns via the fast path.
+	needQuote := false
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if noEscapeTable[b] {
+			// space (0x20) is in noEscapeTable but still forces quoting.
+			if quote && b == ' ' {
+				needQuote = true
+			}
+			continue
+		}
+		// b needs escaping (or is a tab). Re-scan the rest only when we still
+		// don't know whether quoting is required, to keep output identical.
+		if quote && !needQuote {
+			for j := i; j < len(s); j++ {
+				if c := s[j]; c == ' ' || c == '\t' {
+					needQuote = true
+					break
+				}
+			}
+		}
+		if needQuote {
+			dst = append(dst, '"')
+		}
+		dst = appendStringComplex(dst, s, i)
+		if needQuote {
+			dst = append(dst, '"')
+		}
+		return dst
+	}
+	// No escape characters — fast path: just copy the string, with quotes if needed.
+	if needQuote {
 		dst = append(dst, '"')
 	}
-	// Start with a double quote.
-	// Loop through each character in the string.
-	for i := 0; i < len(s); i++ {
-		// Check if the character needs encoding. Control characters, slashes,
-		// and the double quote need json encoding. Bytes above the ascii
-		// boundary needs utf8 encoding.
-		if !noEscapeTable[s[i]] {
-			// We encountered a character that needs to be encoded. Switch
-			// to complex version of the algorithm.
-			dst = appendStringComplex(dst, s, i)
-			if quote {
-				dst = append(dst, '"')
-			}
-			return dst
-		}
-	}
-	// The string has no need for encoding and therefore is directly
-	// appended to the byte slice.
 	dst = append(dst, s...)
-	// End with a double quote
-	if quote {
+	if needQuote {
 		dst = append(dst, '"')
 	}
 	return dst

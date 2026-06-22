@@ -10,8 +10,6 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
-// 调用栈跳帧常量：putCaller 内 runtime.Callers 据此定位用户代码帧。
-// 普通路径 callerBaseSkip=4；经标准库劫持的 Write 路径 writerBaseSkip=7。
 const (
 	callerBaseSkip = 4
 	writerBaseSkip = 7

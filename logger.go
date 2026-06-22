@@ -19,16 +19,15 @@ const (
 // Log level (aligned with log/slog numeric values).
 type Level int
 
-// Level 命名，对齐 log/slog（主命名，推荐使用）。
 const (
 	LevelDebug Level = -4       // slog.LevelDebug
 	LevelInfo  Level = 0        // slog.LevelInfo
 	LevelWarn  Level = 4        // slog.LevelWarn
 	LevelError Level = 8        // slog.LevelError
-	LevelNone  Level = 20241020 // 关闭所有输出的哨兵
+	LevelNone  Level = 20241020 // sentinel: disables all output
 )
 
-// 全大写命名，保留以兼容历史代码。
+// Deprecated: Use LevelDebug / LevelInfo / LevelWarn / LevelError / LevelNone instead.
 const (
 	LDEBUG = LevelDebug
 	LINFO  = LevelInfo
@@ -56,9 +55,9 @@ func (lv Level) String() string {
 // Logger is a lightweight handle that shares the root Config.
 // Loggers constructed via New are immutable after creation.
 type Logger struct {
-	cfg   *config // 根级共享配置
-	trace string  // 命名空间 / trace
-	attr  []byte  // 冻结的预设字段（普通 logger 为 nil）
+	cfg   *config // shared root config
+	trace string  // namespace / trace
+	attr  []byte  // frozen preset fields (nil for plain loggers)
 }
 
 // New creates a Logger. When out is nil, output is discarded by default.
@@ -102,10 +101,10 @@ func (l *Logger) preb() *buffer {
 	return &b
 }
 
-// Trace 派生一个命名空间子 Logger，trace 以点号拼接。
-// Trace derives a namespace child Logger, trace segments are joined with dots.
+// Trace 派生一个子 Logger，使用 trace 替换当前命名空间（不拼接），保留预设字段。
+// Trace derives a child Logger, replacing the current namespace with trace (no joining), preserving preset fields.
 func (l *Logger) Trace(trace string) *Logger {
-	c := &Logger{cfg: l.cfg, trace: joinTrace(l.trace, trace)}
+	c := &Logger{cfg: l.cfg, trace: trace}
 	if len(l.attr) > 0 {
 		c.attr = make([]byte, len(l.attr))
 		copy(c.attr, l.attr)
@@ -113,10 +112,14 @@ func (l *Logger) Trace(trace string) *Logger {
 	return c
 }
 
-// Clone 派生一个子 Logger，保留命名空间与预设字段。
-// Clone derives a child Logger, preserving namespace and preset fields.
-func (l *Logger) Clone() *Logger {
-	c := &Logger{cfg: l.cfg, trace: l.trace}
+// Clone 派生一个子 Logger，保留预设字段；可选 trace 以点号追加到当前命名空间。
+// Clone derives a child Logger preserving preset fields; an optional trace is appended to the current namespace with a dot.
+func (l *Logger) Clone(trace ...string) *Logger {
+	nt := l.trace
+	if len(trace) > 0 {
+		nt = joinTrace(l.trace, trace[0])
+	}
+	c := &Logger{cfg: l.cfg, trace: nt}
 	if len(l.attr) > 0 {
 		c.attr = make([]byte, len(l.attr))
 		copy(c.attr, l.attr)
