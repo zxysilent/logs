@@ -7,7 +7,7 @@
 - **Four log levels**: `DEBUG` `INFO` `WARN` `ERROR`
 - **Global default or custom instances**: `logs.New(w)` or package-level functions
 - **Structured field chains**: `With().Str("k","v").Int("n",1).Info()`
-- **Namespace (Ns)**: `Ns("api").Info()` → `trace=api`
+- **Namespace (Trace)**: `Trace("api").Info()` → `trace=api`
 - **Distributed tracing**: `TraceCtx` / `TraceId` / `Ctx`
 - **Auto-hijack stdlib** `log`: `New()` converts stdlog → logfmt automatically
 - **Stdlib-compatible signatures**: `Print/Printf/Println`
@@ -30,12 +30,12 @@ import (
 
 func main() {
     // === Default global instance ===
-    logs.SetLevel(logs.LDEBUG) // LDEBUG for dev, LINFO for production
+    logs.SetLevel(logs.LevelDebug) // LevelDebug for dev, LevelInfo for production
     logs.SetCaller(true)
     logs.Info("hello world")
 
-    // === Namespace (Ns) ===
-    apiLog := logs.Ns("api")
+    // === Namespace (Trace) ===
+    apiLog := logs.Trace("api")
     apiLog.Info("server started")                  // trace=api
     ctx := logs.TraceCtx(context.Background(), "req-1")
     apiLog.Ctx(ctx).Info("handle")                 // trace=api.req-1
@@ -58,7 +58,7 @@ func main() {
     // === Custom instance (file output) ===
     w, closeFn := logs.NewFile("./logs/app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
     defer closeFn()
-    applog := logs.New(w, logs.WithLevel(logs.LINFO))
+    applog := logs.New(w, logs.WithLevel(logs.LevelInfo))
     applog.Info("app started")
 }
 ```
@@ -69,26 +69,30 @@ func main() {
 
 ### Log Levels
 
+Numerically aligned with `log/slog` (higher = more severe).
+
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `logs.LDEBUG` | 0 | Debug |
-| `logs.LINFO` | 1 | Info |
-| `logs.LWARN` | 2 | Warning |
-| `logs.LERROR` | 3 | Error |
-| `logs.LNONE` | 4 | Disabled |
+| `logs.LevelDebug` | -4 | Debug |
+| `logs.LevelInfo` | 0 | Info |
+| `logs.LevelWarn` | 4 | Warning |
+| `logs.LevelError` | 8 | Error |
+| `logs.LevelMute` | 20241020 | Disables all output (sentinel) |
+
+> `LDEBUG` / `LINFO` / `LWARN` / `LERROR` / `LNONE` are deprecated and will be removed in a future major version.
 
 ### Package-level Functions (operate on default instance)
 
 ```go
-logs.SetLevel(lv logLevel)                          // set log level
+logs.SetLevel(lv Level)                             // set log level
 logs.SetCaller(b bool)                              // enable/disable caller line
 logs.SetSep(sep ...string)                          // path separators, default "/" (right-most match wins)
 logs.SetSkip(skip int)                              // extra caller skip frames
 logs.SetOutput(out io.Writer)                       // set output writer
 logs.SetFile(path string)                           // set file output
-logs.SetMaxAge(ma int)                              // max retention days, default 31
-logs.SetMaxSize(ms int64)                           // max file size (MB), default 64
-logs.SetCons(b bool)                                // also print to stderr
+logs.SetMaxAge(ma int)                              // max retention days, default 64
+logs.SetMaxSize(ms int64)                           // max file size (MiB), default 64
+logs.SetConsole(b bool)                             // also print to stderr (recommended)
 logs.Close() error                                  // close
 
 // Output
@@ -110,8 +114,9 @@ logs.Printf(format string, args ...any)
 logs.With(trace ...string) *fielder
 logs.Ctx(ctx context.Context) *fielder
 
-// Namespace
-logs.Ns(ns string) *Logger
+// Namespace / sub-Logger
+logs.Trace(trace string) *Logger     // replace namespace
+logs.Clone(trace ...string) *Logger  // copy (no args) or append trace
 ```
 
 ### Logger (custom instance)
@@ -122,7 +127,7 @@ A `New` logger is configured once via functional options and is **immutable** af
 ```go
 // Construct with options (out=nil means Discard)
 l := logs.New(w,
-    logs.WithLevel(logs.LDEBUG),
+    logs.WithLevel(logs.LevelDebug),
     logs.WithCaller(true),
     logs.WithSep("/internal", "/"),
     logs.WithSkip(0),
@@ -136,18 +141,17 @@ l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
 l.Warn(...)   l.Warnf(...)   l.Error(...) l.Errorf(...)
 l.Print(...)  l.Println(...) l.Printf(...)
 l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
-l.Ns(ns string) *Logger            // namespaced sub-logger (shares root config)
-l.Group() *Logger                  // sub-logger keeping ns/fields (shares root config)
-l.Writer() io.Writer     // returns an io.Writer, writes logfmt
+l.Trace(trace string) *Logger      // namespaced sub-logger (shares root config)
+l.Clone(trace ...string) *Logger  // copy (no args) or append trace
 ```
 
-### Namespace / reusable scope (sub-Logger)
+### Namespace / sub-Logger
 
-`Ns`/`Scope` derive a sub-`Logger` that shares the parent's root `Config`.
+`Trace`/`Clone` derive a sub-`Logger` that shares the parent's root `Config`.
 
 ```go
-api := logs.Ns("api")            // *Logger, trace=api
-pay := api.Ns("pay")             // *Logger, trace=api.pay (nested)
+api := logs.Trace("api")         // *Logger, trace=api (replace)
+pay := api.Clone("pay")          // *Logger, trace=api.pay (append)
 api.Debug(...)  api.Info(...)  api.Warn(...)  api.Error(...)  api.Print(...)
 api.With() *fielder              // derive a one-shot fielder, inherits attr+trace
 api.Ctx(ctx context.Context) *fielder
@@ -211,10 +215,6 @@ stdlog.Println("hello")       // output: trace=myprefix level=INF msg=hello
 // Print compat — package-level Print/Printf/Println → logfmt
 logs.Print("a", "b")          // msg=ab
 logs.Printf("%s:%d", "k", 1)  // msg=k:1
-
-// Writer — returns io.Writer for bridging third-party libraries
-w := l.Writer()
-w.Write([]byte("raw message"))
 ```
 
 ---

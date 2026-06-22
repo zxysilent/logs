@@ -629,8 +629,8 @@ func TestCallerLineFieldError(t *testing.T) {
 	}
 }
 
-// TestCallerLineNsInfo verifies caller line number for NsLogger.Info.
-func TestCallerLineNsInfo(t *testing.T) {
+// TestCallerLineTraceInfo verifies caller line number for Logger.Trace.
+func TestCallerLineTraceInfo(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -642,15 +642,15 @@ func TestCallerLineNsInfo(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger Info caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger Info caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/logger.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
 
-// TestCallerLineNsDebug verifies caller line number for NsLogger.Debug.
-func TestCallerLineNsDebug(t *testing.T) {
+// TestCallerLineTraceDebug verifies caller line number for Logger.Trace.
+func TestCallerLineTraceDebug(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -662,15 +662,15 @@ func TestCallerLineNsDebug(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger Debug caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger Debug caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/logger.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
 
-// TestCallerLineNsWarn verifies caller line number for NsLogger.Warn.
-func TestCallerLineNsWarn(t *testing.T) {
+// TestCallerLineTraceWarn verifies caller line number for Logger.Trace.
+func TestCallerLineTraceWarn(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -682,15 +682,15 @@ func TestCallerLineNsWarn(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger Warn caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger Warn caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/logger.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
 
-// TestCallerLineNsError verifies caller line number for NsLogger.Error.
-func TestCallerLineNsError(t *testing.T) {
+// TestCallerLineTraceError verifies caller line number for Logger.Trace.
+func TestCallerLineTraceError(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -702,15 +702,15 @@ func TestCallerLineNsError(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger Error caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger Error caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/scope.go") || strings.Contains(got, "caller=/assist.go") {
+	if strings.Contains(got, "caller=/logger.go") || strings.Contains(got, "caller=/assist.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
 
-// TestCallerLineNsWith verifies caller line number for NsLogger.With().
-func TestCallerLineNsWith(t *testing.T) {
+// TestCallerLineTraceWith verifies caller line number for Logger.Trace.
+func TestCallerLineTraceWith(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -722,15 +722,15 @@ func TestCallerLineNsWith(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger With caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger With caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/scope.go") {
+	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/logger.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
 
-// TestCallerLineNsCtx verifies caller line number for NsLogger.Ctx().
-func TestCallerLineNsCtx(t *testing.T) {
+// TestCallerLineTraceCtx verifies caller line number for Logger.Trace.
+func TestCallerLineTraceCtx(t *testing.T) {
 	var buf bytes.Buffer
 	l.cfg.setCaller(true)
 	l := Trace("api")
@@ -743,9 +743,9 @@ func TestCallerLineNsCtx(t *testing.T) {
 	got := buf.String()
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
-		t.Fatalf("NsLogger Ctx caller line mismatch: expected :%s, got: %s", expect, got)
+		t.Fatalf("TraceLogger Ctx caller line mismatch: expected :%s, got: %s", expect, got)
 	}
-	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/scope.go") {
+	if strings.Contains(got, "caller=/field.go") || strings.Contains(got, "caller=/logger.go") {
 		t.Fatalf("caller points to internal file: %s", got)
 	}
 }
@@ -893,8 +893,8 @@ func TestIfErrConditionalMultiLevel(t *testing.T) {
 	}
 }
 
-// TestScoper verifies Scope freezes fields into a reusable, concurrency-safe logger.
-func TestScoper(t *testing.T) {
+// TestGroup verifies Group freezes fields into a reusable, concurrency-safe logger.
+func TestGroup(t *testing.T) {
 	l := New(io.Discard)
 	l.cfg.setCaller(false)
 	l.cfg.setLevel(LINFO)
@@ -953,8 +953,8 @@ func TestFieldLoggerPrintSkip(t *testing.T) {
 	}
 }
 
-// TestNsLoggerFormatted verifies NsLogger *f methods and Println/Printf.
-func TestNsLoggerFormatted(t *testing.T) {
+// TestTraceLoggerFormatted verifies Logger.Trace *f methods and Println/Printf.
+func TestTraceLoggerFormatted(t *testing.T) {
 	var buf bytes.Buffer
 	l := Trace("svc")
 	l.cfg.setOutput(&buf)
@@ -963,37 +963,37 @@ func TestNsLoggerFormatted(t *testing.T) {
 
 	l.Debugf("debug %s", "test")
 	if got := buf.String(); !strings.Contains(got, "trace=svc") || !strings.Contains(got, "debug test") {
-		t.Fatalf("NsLogger.Debugf mismatch: %s", got)
+		t.Fatalf("TraceLogger.Debugf mismatch: %s", got)
 	}
 
 	buf.Reset()
 	l.Infof("info %s", "test")
 	if got := buf.String(); !strings.Contains(got, "info test") {
-		t.Fatalf("NsLogger.Infof mismatch: %s", got)
+		t.Fatalf("TraceLogger.Infof mismatch: %s", got)
 	}
 
 	buf.Reset()
 	l.Warnf("warn %s", "test")
 	if got := buf.String(); !strings.Contains(got, "warn test") {
-		t.Fatalf("NsLogger.Warnf mismatch: %s", got)
+		t.Fatalf("TraceLogger.Warnf mismatch: %s", got)
 	}
 
 	buf.Reset()
 	l.Errorf("error %s", "test")
 	if got := buf.String(); !strings.Contains(got, "error test") {
-		t.Fatalf("NsLogger.Errorf mismatch: %s", got)
+		t.Fatalf("TraceLogger.Errorf mismatch: %s", got)
 	}
 
 	buf.Reset()
 	l.Printf("%s:%d", "k", 1)
 	if got := buf.String(); !strings.Contains(got, "k:1") {
-		t.Fatalf("NsLogger.Printf mismatch: %s", got)
+		t.Fatalf("TraceLogger.Printf mismatch: %s", got)
 	}
 
 	buf.Reset()
 	l.Println("a", "b")
 	if got := buf.String(); !strings.Contains(got, "trace=svc") {
-		t.Fatalf("NsLogger.Println trace missing: %s", got)
+		t.Fatalf("TraceLogger.Println trace missing: %s", got)
 	}
 }
 
@@ -1588,7 +1588,7 @@ func TestPrintSpecialChars(t *testing.T) {
 	}
 }
 
-func TestNsSingleArgTypes(t *testing.T) {
+func TestTraceSingleArgTypes(t *testing.T) {
 	var buf bytes.Buffer
 	l := Trace("api")
 	l.cfg.setOutput(&buf)
@@ -1598,28 +1598,28 @@ func TestNsSingleArgTypes(t *testing.T) {
 	l.Info("hello")
 	got := buf.String()
 	if !strings.Contains(got, "trace=api") || !strings.Contains(got, "msg=hello") {
-		t.Fatalf("NsLogger single arg: %s", got)
+		t.Fatalf("TraceLogger single arg: %s", got)
 	}
 
 	buf.Reset()
 	l.Info(42)
 	got = buf.String()
 	if !strings.Contains(got, "trace=api") || !strings.Contains(got, "msg=42") {
-		t.Fatalf("NsLogger int arg: %s", got)
+		t.Fatalf("TraceLogger int arg: %s", got)
 	}
 
 	buf.Reset()
 	l.Info(true)
 	got = buf.String()
 	if !strings.Contains(got, "trace=api") || !strings.Contains(got, "msg=true") {
-		t.Fatalf("NsLogger bool arg: %s", got)
+		t.Fatalf("TraceLogger bool arg: %s", got)
 	}
 
 	buf.Reset()
 	l.Info([]byte("data"))
 	got = buf.String()
 	if !strings.Contains(got, "trace=api") || !strings.Contains(got, "msg=data") {
-		t.Fatalf("NsLogger []byte arg: %s", got)
+		t.Fatalf("TraceLogger []byte arg: %s", got)
 	}
 }
 

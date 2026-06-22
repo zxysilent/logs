@@ -7,8 +7,8 @@ import (
 	"github.com/zxysilent/logs"
 )
 
-// Example: Trace creates a namespaced logger that always emits trace=...
-func Example_traceNs() {
+// Example: Trace replaces the namespace.
+func Example_traceNamespace() {
 	l := logs.Trace("myapp")
 	l.Info("namespaced log")
 	l.Debug("debug with namespace")

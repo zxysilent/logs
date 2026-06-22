@@ -20,9 +20,9 @@ func Example_stdlibHijack() {
 
 // Example: stdlib log respects the logs level filter.
 func Example_stdlibHijackLevel() {
-	logs.SetLevel(logs.LWARN)
+	logs.SetLevel(logs.LevelWarn)
 	stdlog.Println("this INFO message is suppressed")
-	logs.SetLevel(logs.LINFO) // restore
+	logs.SetLevel(logs.LevelInfo) // restore
 	// Output:
 }
 
