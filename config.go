@@ -8,12 +8,16 @@ import (
 )
 
 // config is the root configuration shared by Logger instances.
-// Convention: configuration should be finalized before logging starts, and should not be modified during concurrent use.
+// All configuration MUST be finalized before any logging starts;
+// concurrent Set* calls during logging are undefined behavior.
+// Only the package-level default instance exposes runtime Set* methods —
+// these are provided as a convenience for simple applications that configure
+// before logging, not for dynamic reconfiguration at runtime.
 type config struct {
 	mu     sync.Mutex
 	out    io.Writer
 	fw     *file.Writer
-	sep    []string // 路径分隔（取匹配位置最靠后的一个）
+	sep    []string // Path separator (take the one furthest to the right in the matching position)
 	level  Level
 	skip   int
 	caller bool
@@ -26,7 +30,7 @@ type Option func(*config)
 // WithLevel sets the log level.
 func WithLevel(lv Level) Option {
 	return func(c *config) {
-		if lv < LevelDebug || lv > LevelNone {
+		if lv < LevelDebug || lv > LevelMute {
 			panic("illegal logs level")
 		}
 		c.level = lv
@@ -73,7 +77,7 @@ func WithConsole(b bool) FileOption { return func(fw *file.Writer) { fw.SetConso
 
 // setLevel sets the log level under lock.
 func (c *config) setLevel(lv Level) {
-	if lv < LevelDebug || lv > LevelNone {
+	if lv < LevelDebug || lv > LevelMute {
 		panic("illegal logs level")
 	}
 	c.mu.Lock()

@@ -92,7 +92,7 @@ logs.SetOutput(out io.Writer)                       // 设置输出
 logs.SetFile(path string)                           // 设置文件输出
 logs.SetMaxAge(ma int)                              // 最大保留天数，默认 64
 logs.SetMaxSize(ms int64)                           // 单文件最大容量(MiB)，默认 64
-logs.SetCons(b bool)                                // 同时输出控制台
+logs.SetConsole(b bool)                             // 同时输出控制台 (推荐)
 logs.Close() error                                  // 关闭
 
 // 输出
@@ -115,8 +115,8 @@ logs.With(trace ...string) *fielder
 logs.Ctx(ctx context.Context) *fielder
 
 // 命名空间 / 子 Logger
-logs.Trace(trace string) *Logger    // 命名空间子 Logger
-logs.Clone() *Logger                // 保留 ns/字段的子 Logger
+logs.Trace(trace string) *Logger     // 替换命名空间的子 Logger
+logs.Clone(trace ...string) *Logger  // 纯复制（无参）或追加 trace（有参）
 ```
 
 ### Logger（自建实例）

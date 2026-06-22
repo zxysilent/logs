@@ -66,7 +66,7 @@ func TestConfigSharedAcrossTrace(t *testing.T) {
 	}
 }
 
-// TestSetFile verifies the package-level SetFile/SetMaxAge/SetMaxSize/SetCons path
+// TestSetFile verifies the package-level SetFile/SetMaxAge/SetMaxSize/SetConsole path
 // (the runtime-mutable default instance).
 func TestSetFile(t *testing.T) {
 	// Save & restore the default instance's output so the test is isolated.
@@ -77,7 +77,7 @@ func TestSetFile(t *testing.T) {
 	SetFile(dir + "/app.log")
 	SetMaxAge(7)
 	SetMaxSize(2)
-	SetCons(false)
+	SetConsole(false)
 	SetLevel(LINFO)
 	defer Close()
 
@@ -153,21 +153,20 @@ func TestSetOutputNil(t *testing.T) {
 	l.Info("no panic")
 }
 
-// TestLevelString verifies String() covers standard, intermediate, and OFF levels.
+// TestLevelString verifies String() covers all standard levels; non-standard fall to OFF.
 func TestLevelString(t *testing.T) {
 	cases := []struct {
 		lv   Level
 		want string
 	}{
-		{LDEBUG, "DBG"},
-		{LDEBUG + 1, "DBG"}, // -3, still below INFO
-		{LINFO, "INF"},
-		{LINFO + 2, "INF"}, // intermediate, below WARN
-		{LWARN, "WRN"},
-		{LWARN + 1, "WRN"},
-		{LERROR, "ERR"},
-		{LERROR + 100, "ERR"}, // below sentinel
-		{LNONE, "OFF"},
+		{LevelDebug, "DBG"},
+		{LevelInfo, "INF"},
+		{LevelWarn, "WRN"},
+		{LevelError, "ERR"},
+		{LevelMute, "OFF"},
+		{LevelDebug + 1, "OFF"},   // intermediate, below INFO → OFF
+		{LevelInfo + 2, "OFF"},    // intermediate, below WARN → OFF
+		{LevelError + 100, "OFF"}, // intermediate, below sentinel → OFF
 	}
 	for _, c := range cases {
 		if got := c.lv.String(); got != c.want {
@@ -234,5 +233,53 @@ func TestLoggerClonePresetFields(t *testing.T) {
 	got := buf.String()
 	if !strings.Contains(got, "svc=auth") {
 		t.Fatalf("Clone should preserve preset fields: %s", got)
+	}
+}
+
+// TestParseLevel verifies ParseLevel handles all valid short/long/case variants.
+func TestParseLevel(t *testing.T) {
+	tests := []struct {
+		s  string
+		lv Level
+	}{
+		// short
+		{"DBG", LevelDebug},
+		{"INF", LevelInfo},
+		{"WRN", LevelWarn},
+		{"ERR", LevelError},
+		{"OFF", LevelMute},
+		// long
+		{"DEBUG", LevelDebug},
+		{"INFO", LevelInfo},
+		{"WARN", LevelWarn},
+		{"WARNING", LevelWarn},
+		{"ERROR", LevelError},
+		{"NONE", LevelMute},
+		// single-letter
+		{"D", LevelDebug},
+		{"I", LevelInfo},
+		{"W", LevelWarn},
+		{"E", LevelError},
+		// numeric (slog values)
+		{"-4", LevelDebug},
+		{"0", LevelInfo},
+		{"4", LevelWarn},
+		{"8", LevelError},
+		// case-insensitive
+		{"dbg", LevelDebug},
+		{"info", LevelInfo},
+		{"Warning", LevelWarn},
+		{"ERROR", LevelError},
+		{"none", LevelMute},
+		// invalid
+		{"TRACE", LevelInfo},
+		{"FATAL", LevelInfo},
+		{"", LevelInfo},
+	}
+	for _, tt := range tests {
+		got := ParseLevel(tt.s)
+		if got != tt.lv {
+			t.Fatalf("ParseLevel(%q)=%v, want %v", tt.s, got, tt.lv)
+		}
 	}
 }

@@ -331,7 +331,7 @@ func TestGroupBasic(t *testing.T) {
 }
 func TestWriter(t *testing.T) {
 	SetFile("./logs/app.log")
-	SetCons(true)
+	SetConsole(true)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {
 		With().Int("idx", i).Debug()
@@ -354,7 +354,7 @@ func TestWriter(t *testing.T) {
 // TestGroupFromCtx verifies Ctx + Group + With combination.
 func TestGroupFromCtx(t *testing.T) {
 	SetFile("./logs/app.log")
-	SetCons(true)
+	SetConsole(true)
 	SetCaller(true)
 	ctx := TraceCtx(context.Background())
 	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Group()
@@ -820,8 +820,8 @@ func TestLevelFilterErrorOnly(t *testing.T) {
 	}
 }
 
-// TestLevelNone verifies LNONE filters everything.
-func TestLevelNone(t *testing.T) {
+// TestLevelMute verifies LevelMute filters everything.
+func TestLevelMute(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
 	l.cfg.setCaller(false)
@@ -832,7 +832,7 @@ func TestLevelNone(t *testing.T) {
 	l.Warn("no")
 	l.Error("no")
 	if got := buf.String(); got != "" {
-		t.Fatalf("LNONE didn't filter all, got: %s", got)
+		t.Fatalf("LevelMute didn't filter all, got: %s", got)
 	}
 }
 
@@ -1135,10 +1135,11 @@ func TestPrintWriter(t *testing.T) {
 	}
 }
 
-// TestSetConsNoFile verifies SetCons on a logger with no file writer returns early without panic.
-func TestSetConsNoFile(t *testing.T) {
+// TestSetConsoleNoFile verifies SetConsole on a logger with no file writer returns early without panic.
+func TestSetConsoleNoFile(t *testing.T) {
 	l := New(io.Discard)   // no SetFile → fw == nil
 	l.cfg.setConsole(true) // should not panic, fw==nil branch
+	SetCons(true)          // deprecated wrapper — still covered for backward compat
 }
 
 // TestWithTrace verifies Logger.With(trace) sets the trace on the fielder.

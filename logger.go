@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 	"io"
+	"strings"
 
 	"github.com/zxysilent/logs/internal/file"
 )
@@ -24,31 +25,53 @@ const (
 	LevelInfo  Level = 0        // slog.LevelInfo
 	LevelWarn  Level = 4        // slog.LevelWarn
 	LevelError Level = 8        // slog.LevelError
-	LevelNone  Level = 20241020 // sentinel: disables all output
+	LevelMute  Level = 20241020 // sentinel: disables all output
 )
 
-// Deprecated: Use LevelDebug / LevelInfo / LevelWarn / LevelError / LevelNone instead.
+// Deprecated: Use LevelDebug / LevelInfo / LevelWarn / LevelError / LevelMute instead.
 const (
 	LDEBUG = LevelDebug
 	LINFO  = LevelInfo
 	LWARN  = LevelWarn
 	LERROR = LevelError
-	LNONE  = LevelNone
+	LNONE  = LevelMute
 )
 
 // String returns the short name of the level.
 func (lv Level) String() string {
-	switch {
-	case lv < LevelInfo:
+	switch lv {
+	case LevelDebug:
 		return "DBG"
-	case lv < LevelWarn:
+	case LevelInfo:
 		return "INF"
-	case lv < LevelError:
+	case LevelWarn:
 		return "WRN"
-	case lv < LevelNone:
+	case LevelError:
 		return "ERR"
 	default:
 		return "OFF"
+	}
+}
+
+// ParseLevel parses a level string (case-insensitive) into a Level.
+// Accepts short ("DBG","INF","WRN","ERR","OFF"), long ("DEBUG","INFO","WARN",
+// "WARNING","ERROR","NONE"), single-letter ("D","I","W","E"), and numeric
+// slog values ("-4","0","4","8").
+// Returns LevelInfo when the input is unrecognized.
+func ParseLevel(s string) Level {
+	switch strings.ToUpper(s) {
+	case "D", "DBG", "DEBUG", "-4":
+		return LevelDebug
+	case "I", "INF", "INFO", "INFOMATION", "0":
+		return LevelInfo
+	case "W", "WRN", "WARN", "WARNING", "4":
+		return LevelWarn
+	case "E", "ERR", "ERROR", "8":
+		return LevelError
+	case "OFF", "NONE", "MUTE", "DISABLE", "DISABLED":
+		return LevelMute
+	default:
+		return LevelInfo
 	}
 }
 
@@ -60,7 +83,10 @@ type Logger struct {
 	attr  []byte  // frozen preset fields (nil for plain loggers)
 }
 
-// New creates a Logger. When out is nil, output is discarded by default.
+// New creates an immutable Logger with the given output and options.
+// All configuration is applied once at construction time; the returned Logger
+// has no Set* methods — for runtime reconfiguration use the package-level
+// default instance (logs.SetLevel etc.) but prefer NewFile+New for new apps.
 func New(out io.Writer, opts ...Option) *Logger {
 	if out == nil {
 		out = io.Discard

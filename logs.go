@@ -50,12 +50,15 @@ func SetMaxSize(ms int64) {
 }
 
 // SetCons sets whether to also output to the console.
-// Deprecated: Use SetConsole instead.
+//
+// Deprecated: Use SetConsole instead. This alias is kept for backward
+// compatibility and will be removed in a future major version.
 func SetCons(b bool) {
 	l.cfg.setConsole(b)
 }
 
-// SetConsole sets whether to also output to the console.
+// SetConsole sets whether to also output to stderr when writing to a file.
+// Only takes effect when a file writer is active (SetFile).
 func SetConsole(b bool) {
 	l.cfg.setConsole(b)
 }
@@ -67,37 +70,42 @@ func SetTrace(trace string) {
 	l.trace = trace
 }
 
-// Debug logs at debug level using the default instance.
+// The following functions use method-valued variables instead of wrapper
+// functions to keep the caller skip depth identical: logs.Debug and l.Debug
+// produce the same caller:file:line. Wrapping with `func Debug(...) { l.Debug(...) }`
+// would add one extra frame, pushing the caller one level further.
+
+// Debug logs at debug level.
 var Debug = l.Debug
 
-// Debugf logs a formatted message at debug level using the default instance.
+// Debugf logs a formatted message at debug level.
 var Debugf = l.Debugf
 
-// Info logs at info level using the default instance.
+// Info logs at info level.
 var Info = l.Info
 
-// Infof logs a formatted message at info level using the default instance.
+// Infof logs a formatted message at info level.
 var Infof = l.Infof
 
-// Warn logs at warn level using the default instance.
+// Warn logs at warn level.
 var Warn = l.Warn
 
-// Warnf logs a formatted message at warn level using the default instance.
+// Warnf logs a formatted message at warn level.
 var Warnf = l.Warnf
 
-// Error logs at error level using the default instance.
+// Error logs at error level.
 var Error = l.Error
 
-// Errorf logs a formatted message at error level using the default instance.
+// Errorf logs a formatted message at error level.
 var Errorf = l.Errorf
 
-// Print logs at info level (stdlib-compatible) using the default instance.
+// Print logs at info level (stdlib-compatible).
 var Print = l.Print
 
-// Printf logs a formatted message at info level (stdlib-compatible) using the default instance.
+// Printf logs a formatted message at info level (stdlib-compatible).
 var Printf = l.Printf
 
-// Println logs at info level (stdlib-compatible) using the default instance.
+// Println logs at info level (stdlib-compatible).
 var Println = l.Println
 
 // With is the field logging entry.
