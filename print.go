@@ -10,15 +10,14 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
+// 调用栈跳帧常量：putCaller 内 runtime.Callers 据此定位用户代码帧。
+// 普通路径 callerBaseSkip=4；经标准库劫持的 Write 路径 writerBaseSkip=7。
 const (
-	callerBaseSkip = 2
-	writeExtraSkip = 2
+	callerBaseSkip = 4
+	writerBaseSkip = 7
 )
 
-// lastSep 返回 file 中任一分隔符最靠后的匹配下标，无匹配返回 -1。
-// 采用从右向左单次扫描 + 首字节剪枝：仅当当前字节等于某个分隔符首字节时才做整串比较，
-// 命中即返回（最靠后）。相比对每个分隔符各做一次全串查找，在多个多字符分隔符
-// （如 "/internal"、"/src"）场景下更快且零分配。
+// lastSep returns the last index where any separator matches in file, or -1 if none.
 func lastSep(file string, seps []string) int {
 	for i := len(file) - 1; i >= 0; i-- {
 		c := file[i]
@@ -34,7 +33,29 @@ func lastSep(file string, seps []string) int {
 	return -1
 }
 
-func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, args ...any) {
+// putCaller writes "caller=file:line" into buf using runtime.Callers + FuncForPC.FileLine
+// (no allocation: pcs does not escape and FileLine does not allocate).
+// skip is the full frame count passed to runtime.Callers (computed by the caller).
+func (c *config) putCaller(buf *buffer, skip int) {
+	var pcs [1]uintptr
+	file := "###"
+	line := 0
+	if runtime.Callers(skip, pcs[:]) >= 1 {
+		// PC-1 points into the CALL instruction (CallersFrames semantics).
+		if fn := runtime.FuncForPC(pcs[0] - 1); fn != nil {
+			file, line = fn.FileLine(pcs[0] - 1)
+			if slash := lastSep(file, c.sep); slash >= 0 {
+				file = file[slash:]
+			}
+		}
+	}
+	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
+	*buf = append(*buf, ':')
+	*buf = strconv.AppendInt(*buf, int64(line), 10)
+}
+
+// print writes a log record.
+func (c *config) print(trace string, lv Level, caller bool, attr *buffer, args ...any) {
 	buf := getb()
 	defer putb(buf)
 	*buf = textenc.PutBegin(*buf)
@@ -44,19 +65,7 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
 	}
 	if caller {
-		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip)
-		if !ok {
-			file = "###"
-			line = 0
-		} else {
-			slash := lastSep(file, log.sep)
-			if slash >= 0 {
-				file = file[slash:]
-			}
-		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
-		*buf = append(*buf, ':')
-		*buf = strconv.AppendInt(*buf, int64(line), 10)
+		c.putCaller(buf, c.skip+callerBaseSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -106,10 +115,11 @@ func print(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, ar
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
-	log.Write(*buf)
+	c.out.Write(*buf)
 }
 
-func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, format string, args ...any) {
+// printf writes a formatted log record.
+func (c *config) printf(trace string, lv Level, caller bool, attr *buffer, format string, args ...any) {
 	buf := getb()
 	defer putb(buf)
 	*buf = textenc.PutBegin(*buf)
@@ -119,19 +129,7 @@ func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, f
 		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
 	}
 	if caller {
-		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip)
-		if !ok {
-			file = "###"
-			line = 0
-		} else {
-			slash := lastSep(file, log.sep)
-			if slash >= 0 {
-				file = file[slash:]
-			}
-		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
-		*buf = append(*buf, ':')
-		*buf = strconv.AppendInt(*buf, int64(line), 10)
+		c.putCaller(buf, c.skip+callerBaseSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -144,10 +142,11 @@ func printf(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, f
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
-	log.Write(*buf)
+	c.out.Write(*buf)
 }
 
-func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, msg []byte) {
+// printb writes a log record with a byte slice message.
+func (c *config) printb(trace string, lv Level, caller bool, attr *buffer, msg []byte) {
 	buf := getb()
 	defer putb(buf)
 	*buf = textenc.PutBegin(*buf)
@@ -157,19 +156,7 @@ func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, m
 		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
 	}
 	if caller {
-		_, file, line, ok := runtime.Caller(log.skip + callerBaseSkip + writeExtraSkip)
-		if !ok {
-			file = "###"
-			line = 0
-		} else {
-			slash := lastSep(file, log.sep)
-			if slash >= 0 {
-				file = file[slash:]
-			}
-		}
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
-		*buf = append(*buf, ':')
-		*buf = strconv.AppendInt(*buf, int64(line), 10)
+		c.putCaller(buf, c.skip+writerBaseSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
 		*buf = textenc.PutDelim(*buf)
@@ -180,26 +167,28 @@ func printb(trace string, lv logLevel, caller bool, log *Logger, attr *buffer, m
 	}
 	*buf = textenc.PutEnd(*buf)
 	*buf = textenc.PutBreak(*buf)
-	log.Write(*buf)
-}
-
-// buffer adapted from go/src/fmt/print.go
-type buffer []byte
-
-// Having an initial size gives a dramatic speedup.
-var bpool = sync.Pool{
-	New: func() any {
-		b := make([]byte, 0, 512)
-		return (*buffer)(&b)
-	},
-}
-
-func getb() *buffer {
-	return bpool.Get().(*buffer)
+	c.out.Write(*buf)
 }
 
 const maxBufferSize = 512
 
+// buffer adapted from go/src/fmt/print.go
+type buffer []byte
+
+// bpool reuses buffers across log calls. An initial size gives a dramatic speedup.
+var bpool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 0, maxBufferSize)
+		return (*buffer)(&b)
+	},
+}
+
+// getb gets a pooled buffer.
+func getb() *buffer {
+	return bpool.Get().(*buffer)
+}
+
+// putb returns a buffer to the pool, dropping oversized ones to bound peak memory.
 func putb(b *buffer) {
 	if b == nil {
 		return
@@ -211,12 +200,15 @@ func putb(b *buffer) {
 	}
 }
 
+// fpool reuses fielder values to avoid per-call allocation.
 var fpool = sync.Pool{New: func() any { return &fielder{} }}
 
+// getfl gets a pooled fielder.
 func getfl() *fielder {
 	return fpool.Get().(*fielder)
 }
 
+// putfl resets and returns a fielder to the pool.
 func putfl(fl *fielder) {
 	if fl == nil {
 		return

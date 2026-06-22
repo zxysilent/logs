@@ -7,6 +7,7 @@ import (
 	"github.com/zxysilent/logs/internal/textenc"
 )
 
+// Str adds a string field.
 func (s *fielder) Str(key, val string) *fielder {
 	if s.attr == nil {
 		return s
@@ -15,6 +16,7 @@ func (s *fielder) Str(key, val string) *fielder {
 	return s
 }
 
+// Stringer adds a field from a fmt.Stringer (nil renders as null).
 func (s *fielder) Stringer(key string, val fmt.Stringer) *fielder {
 	if s.attr == nil {
 		return s
@@ -28,6 +30,7 @@ func (s *fielder) Stringer(key string, val fmt.Stringer) *fielder {
 	return s
 }
 
+// Bytes adds a byte-slice field.
 func (s *fielder) Bytes(key string, val []byte) *fielder {
 	if s.attr == nil {
 		return s
@@ -36,6 +39,7 @@ func (s *fielder) Bytes(key string, val []byte) *fielder {
 	return s
 }
 
+// Err adds an error field (nil renders as null).
 func (s *fielder) Err(err error) *fielder {
 	if s.attr == nil {
 		return s
@@ -48,6 +52,7 @@ func (s *fielder) Err(err error) *fielder {
 	return s
 }
 
+// IfErr adds an error field only if err is non-nil; otherwise the log is skipped.
 func (s *fielder) IfErr(err error) *fielder {
 	if err == nil {
 		s.skip = true
@@ -60,11 +65,13 @@ func (s *fielder) IfErr(err error) *fielder {
 	return s
 }
 
+// If skips the log unless b is true.
 func (s *fielder) If(b bool) *fielder {
 	s.skip = !b
 	return s
 }
 
+// Bool adds a bool field.
 func (s *fielder) Bool(key string, b bool) *fielder {
 	if s.attr == nil {
 		return s
@@ -73,6 +80,7 @@ func (s *fielder) Bool(key string, b bool) *fielder {
 	return s
 }
 
+// Int adds an int field.
 func (s *fielder) Int(key string, i int) *fielder {
 	if s.attr == nil {
 		return s
@@ -81,6 +89,7 @@ func (s *fielder) Int(key string, i int) *fielder {
 	return s
 }
 
+// Int8 adds an int8 field.
 func (s *fielder) Int8(key string, i int8) *fielder {
 	if s.attr == nil {
 		return s
@@ -89,6 +98,7 @@ func (s *fielder) Int8(key string, i int8) *fielder {
 	return s
 }
 
+// Int16 adds an int16 field.
 func (s *fielder) Int16(key string, i int16) *fielder {
 	if s.attr == nil {
 		return s
@@ -97,6 +107,7 @@ func (s *fielder) Int16(key string, i int16) *fielder {
 	return s
 }
 
+// Int32 adds an int32 field.
 func (s *fielder) Int32(key string, i int32) *fielder {
 	if s.attr == nil {
 		return s
@@ -105,6 +116,7 @@ func (s *fielder) Int32(key string, i int32) *fielder {
 	return s
 }
 
+// Int64 adds an int64 field.
 func (s *fielder) Int64(key string, i int64) *fielder {
 	if s.attr == nil {
 		return s
@@ -113,6 +125,7 @@ func (s *fielder) Int64(key string, i int64) *fielder {
 	return s
 }
 
+// Uint adds a uint field.
 func (s *fielder) Uint(key string, i uint) *fielder {
 	if s.attr == nil {
 		return s
@@ -121,6 +134,7 @@ func (s *fielder) Uint(key string, i uint) *fielder {
 	return s
 }
 
+// Uint8 adds a uint8 field.
 func (s *fielder) Uint8(key string, i uint8) *fielder {
 	if s.attr == nil {
 		return s
@@ -129,6 +143,7 @@ func (s *fielder) Uint8(key string, i uint8) *fielder {
 	return s
 }
 
+// Uint16 adds a uint16 field.
 func (s *fielder) Uint16(key string, i uint16) *fielder {
 	if s.attr == nil {
 		return s
@@ -137,6 +152,7 @@ func (s *fielder) Uint16(key string, i uint16) *fielder {
 	return s
 }
 
+// Uint32 adds a uint32 field.
 func (s *fielder) Uint32(key string, i uint32) *fielder {
 	if s.attr == nil {
 		return s
@@ -145,6 +161,7 @@ func (s *fielder) Uint32(key string, i uint32) *fielder {
 	return s
 }
 
+// Uint64 adds a uint64 field.
 func (s *fielder) Uint64(key string, i uint64) *fielder {
 	if s.attr == nil {
 		return s
@@ -153,6 +170,7 @@ func (s *fielder) Uint64(key string, i uint64) *fielder {
 	return s
 }
 
+// Float32 adds a float32 field.
 func (s *fielder) Float32(key string, f float32) *fielder {
 	if s.attr == nil {
 		return s
@@ -161,6 +179,7 @@ func (s *fielder) Float32(key string, f float32) *fielder {
 	return s
 }
 
+// Float64 adds a float64 field.
 func (s *fielder) Float64(key string, f float64) *fielder {
 	if s.attr == nil {
 		return s
@@ -169,6 +188,7 @@ func (s *fielder) Float64(key string, f float64) *fielder {
 	return s
 }
 
+// Time adds a time.Time field.
 func (s *fielder) Time(key string, t time.Time) *fielder {
 	if s.attr == nil {
 		return s
@@ -177,6 +197,7 @@ func (s *fielder) Time(key string, t time.Time) *fielder {
 	return s
 }
 
+// Dur adds a time.Duration field.
 func (s *fielder) Dur(key string, d time.Duration) *fielder {
 	if s.attr == nil {
 		return s
@@ -185,6 +206,7 @@ func (s *fielder) Dur(key string, d time.Duration) *fielder {
 	return s
 }
 
+// Any adds an arbitrary value as a JSON-marshaled field.
 func (s *fielder) Any(key string, i any) *fielder {
 	if s.attr == nil {
 		return s
@@ -193,6 +215,7 @@ func (s *fielder) Any(key string, i any) *fielder {
 	return s
 }
 
+// Raw adds a raw byte field without quoting or escaping.
 func (s *fielder) Raw(key string, b []byte) *fielder {
 	if s.attr == nil {
 		return s

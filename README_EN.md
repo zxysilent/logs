@@ -56,12 +56,9 @@ func main() {
     stdlog.Println("auto hijacked to logfmt")      // hijacked by New()
 
     // === Custom instance (file output) ===
-    applog := logs.New(nil)
-    applog.SetFile("./logs/app.log")
-    applog.SetCons(true)   // also print to stderr
-    applog.SetMaxAge(7)    // keep 7 days
-    applog.SetMaxSize(64)  // max 64MB per file
-    defer applog.Close()
+    w, closeFn := logs.NewFile("./logs/app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+    defer closeFn()
+    applog := logs.New(w, logs.WithLevel(logs.LINFO))
     applog.Info("app started")
 }
 ```
@@ -114,38 +111,50 @@ logs.With(trace ...string) *fielder
 logs.Ctx(ctx context.Context) *fielder
 
 // Namespace
-logs.Ns(ns string) *ScopeLogger
+logs.Ns(ns string) *Logger
 ```
 
 ### Logger (custom instance)
 
+A `New` logger is configured once via functional options and is **immutable** afterwards
+(no `Set*` methods). For runtime-mutable config, use the package-level default instance.
+
 ```go
-l := logs.New(w io.Writer) // nil means Discard
-// All package-level functions have corresponding methods
-l.SetLevel(lv)  l.SetCaller(b)  l.SetSep(s)  l.SetSkip(n)
-l.SetOutput(w)  l.SetFile(p)    l.SetMaxAge(d) l.SetMaxSize(s)
-l.SetCons(b)    l.Close()
+// Construct with options (out=nil means Discard)
+l := logs.New(w,
+    logs.WithLevel(logs.LDEBUG),
+    logs.WithCaller(true),
+    logs.WithSep("/internal", "/"),
+    logs.WithSkip(0),
+)
+
+// File output: NewFile returns the Writer + a close handle; optional MaxAge/MaxSize/Cons
+w, closeFn := logs.NewFile("app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+defer closeFn()
+fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
 l.Warn(...)   l.Warnf(...)   l.Error(...) l.Errorf(...)
 l.Print(...)  l.Println(...) l.Printf(...)
 l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
-l.Ns(ns string) *ScopeLogger
+l.Ns(ns string) *Logger            // namespaced sub-logger (shares root config)
+l.Group() *Logger                  // sub-logger keeping ns/fields (shares root config)
 l.Writer() io.Writer     // returns an io.Writer, writes logfmt
 ```
 
-### ScopeLogger (reusable namespace / field scope)
+### Namespace / reusable scope (sub-Logger)
+
+`Ns`/`Scope` derive a sub-`Logger` that shares the parent's root `Config`.
 
 ```go
-api := logs.Ns("api")            // *ScopeLogger, trace=api
-api.Debug(...)  api.Debugf(...)  api.Info(...)  api.Infof(...)
-api.Warn(...)   api.Warnf(...)   api.Error(...) api.Errorf(...)
-api.Print(...)  api.Println(...) api.Printf(...)
+api := logs.Ns("api")            // *Logger, trace=api
+pay := api.Ns("pay")             // *Logger, trace=api.pay (nested)
+api.Debug(...)  api.Info(...)  api.Warn(...)  api.Error(...)  api.Print(...)
 api.With() *fielder              // derive a one-shot fielder, inherits attr+trace
 api.Ctx(ctx context.Context) *fielder
 // trace = ns (no ctx) or ns.trace (with ctx)
 
-// Freeze a field chain into a persistent, reusable, concurrency-safe ScopeLogger:
-base := logs.With().Str("svc", "api").Int("pid", 1).Scope() // *ScopeLogger
+// Freeze a field chain into a persistent, reusable, concurrency-safe *Logger:
+base := logs.With().Str("svc", "api").Int("pid", 1).Group() // *Logger
 base.Info("started")             // svc=api pid=1, not released, reusable
 base.With().Int("uid", 9).Info("login")
 ```
@@ -169,8 +178,8 @@ fl.Any(key string, i any)        fl.Raw(key string, b []byte)
 fl.If(b bool)                    // conditional output
 fl.Caller(b bool)                // per-entry caller control
 
-// Freeze into a reusable ScopeLogger
-fl.Scope() *ScopeLogger               // persist field chain (no manual release)
+// Freeze into a reusable *Logger
+fl.Group() *Logger                    // persist field chain (no manual release)
 
 // Terminal methods (fielder is recycled after call)
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)

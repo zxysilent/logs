@@ -19,8 +19,8 @@ import (
 func TestPrintCompat(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetLevel(LINFO)
-	l.SetCaller(false)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setCaller(false)
 
 	l.Print("a", "b")
 	if got := buf.String(); !strings.Contains(got, `msg=ab`) {
@@ -61,8 +61,8 @@ func TestInst(t *testing.T) {
 
 func TestBase(t *testing.T) {
 	l := New(os.Stdout)
-	l.SetCaller(true)
-	l.SetLevel(LDEBUG)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LDEBUG)
 	l.Debug("Debug")
 	l.Debugf("%s", "Debugf")
 	l.Info("Info")
@@ -75,7 +75,7 @@ func TestBase(t *testing.T) {
 
 func TestWithBase(t *testing.T) {
 	l := New(os.Stdout)
-	l.SetCaller(true)
+	l.cfg.setCaller(true)
 	ctx := TraceCtx(context.TODO())
 	l.Ctx(ctx).Debug("Debug")
 	l.Ctx(ctx).Debugf("%s", "Debugf")
@@ -88,14 +88,16 @@ func TestWithBase(t *testing.T) {
 	l.Ctx(ctx).If(false).Error("Error")
 	l.Ctx(ctx).If(false).Errorf("%s", "Errorf")
 }
-func TestConfig(t *testing.T) {
+
+// TestConfigFallback verifies nil out + set* methods tolerate nil fw without panic.
+func TestConfigFallback(t *testing.T) {
 	l := New(nil)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetMaxAge(1)
-	l.SetSep("/")
-	l.SetSkip(2)
-	l.SetMaxSize(1024)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setMaxAge(1)
+	l.cfg.setSep("/")
+	l.cfg.setSkip(2)
+	l.cfg.setMaxSize(1024)
 	ctx := TraceCtx(context.TODO())
 	l.Ctx(ctx).Debug("Debug")
 	l.Ctx(ctx).Debugf("%s", "Debugf")
@@ -119,6 +121,15 @@ func TestLastSep(t *testing.T) {
 		{"a/b\\c.go", 3},  // mixed: last is '\'
 		{"a\\b/c.go", 3},  // mixed: last is '/'
 		{"nosep.go", -1},  // no separator
+		{"", -1},          // empty input
+		{"/a/b/c.go", 4},  // last '/' at index 4
+	}
+	// multi-char separators
+	if got := lastSep("a/src/b.go", []string{"/src", "/internal"}); got != 1 {
+		t.Fatalf("lastSep multi-char sep mismatch: %d", got)
+	}
+	if got := lastSep("a/internal/b.go", []string{"/src", "/internal"}); got != 1 {
+		t.Fatalf("lastSep multi-char sep mismatch: %d", got)
 	}
 	for _, c := range cases {
 		if got := lastSep(c.in, seps); got != c.want {
@@ -135,9 +146,9 @@ func TestLastSep(t *testing.T) {
 func TestSetSepMulti(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetSep("/", "\\")
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setSep("/", "\\")
 
 	buf.Reset()
 	l.Info("multi-sep")
@@ -148,7 +159,7 @@ func TestSetSepMulti(t *testing.T) {
 	}
 
 	// SetSep() with no args must keep existing separators
-	l.SetSep()
+	l.cfg.setSep()
 	buf.Reset()
 	l.Info("still-works")
 	if got := buf.String(); !strings.Contains(got, "caller=") {
@@ -158,12 +169,12 @@ func TestSetSepMulti(t *testing.T) {
 
 func TestConfigWithFile(t *testing.T) {
 	l := New(os.Stdout)
-	l.SetFile("./logs/app.log")
-	l.SetCaller(true)
-	l.SetLevel(LERROR)
-	l.SetCons(true)
-	l.SetMaxAge(1)
-	l.SetMaxSize(1024)
+	l.cfg.setFile("./logs/app.log")
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LERROR)
+	l.cfg.setConsole(true)
+	l.cfg.setMaxAge(1)
+	l.cfg.setMaxSize(1024)
 	ctx := TraceCtx(context.TODO())
 	l.Ctx(ctx).Debug("Debug")
 	l.Ctx(ctx).Debugf("%s", "Debugf")
@@ -191,8 +202,6 @@ func (s *blackholeStream) Write(p []byte) (int, error) {
 func BenchmarkParallel(b *testing.B) {
 	stream := &blackholeStream{}
 	logger := New(stream)
-	// logger.SetCaller(true)
-	// logger.caller = true
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -217,16 +226,14 @@ func BenchmarkParallel(b *testing.B) {
 }
 func BenchmarkLog(b *testing.B) {
 	l := New(os.Stdout)
-	l.SetFile("./logs/app.log")
+	l.cfg.setFile("./logs/app.log")
 	for i := 0; i < b.N; i++ {
 		l.Info()
 	}
 }
 func BenchmarkParallelFile(b *testing.B) {
 	logger := New(nil)
-	logger.SetFile("./logs/app.log")
-	// logger.SetCaller(true)
-	// logger.caller = true
+	logger.cfg.setFile("./logs/app.log")
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -276,9 +283,10 @@ func TestField(t *testing.T) {
 	f.Info()
 }
 
-func TestLog(t *testing.T) {
+// TestCtxInfo verifies Ctx + Info/Error basic flow with trace id.
+func TestCtxInfo(t *testing.T) {
 	l := New(os.Stdout)
-	l.SetCaller(true)
+	l.cfg.setCaller(true)
 	ctx := TraceCtx(context.Background(), trace())
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Info()
@@ -291,13 +299,13 @@ func TestLog(t *testing.T) {
 	s.Info("xx")
 }
 
-func TestLog1(t *testing.T) {
+// TestGroupBasic verifies Group then Debug/Info/Error work.
+func TestGroupBasic(t *testing.T) {
 	l := New(os.Stdout)
-	l.SetCaller(true)
-	// l.SetFile("./logs1/app.log")
-	defer l.Close()
+	l.cfg.setCaller(true)
+	defer l.cfg.close()
 	ctx := TraceCtx(context.Background(), trace())
-	l1 := l.Ctx(ctx).Str("basic", "basic").Scope()
+	l1 := l.Ctx(ctx).Str("basic", "basic").Group()
 	l1.Debug()
 	l1.Info()
 	l1.Error()
@@ -308,7 +316,6 @@ func TestLog1(t *testing.T) {
 }
 func TestWriter(t *testing.T) {
 	SetFile("./logs/app.log")
-	// SetText()
 	SetCons(true)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {
@@ -328,12 +335,14 @@ func TestWriter(t *testing.T) {
 	With().Str("idx", "sp ce").Errorf("omit empty")
 	Close()
 }
-func TestSpan(t *testing.T) {
+
+// TestGroupFromCtx verifies Ctx + Group + With combination.
+func TestGroupFromCtx(t *testing.T) {
 	SetFile("./logs/app.log")
 	SetCons(true)
 	SetCaller(true)
 	ctx := TraceCtx(context.Background())
-	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Scope()
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Group()
 	n.With().Str("b", "b").Info("xx")
 	n.With().Str("c", "c").Info("xx")
 }
@@ -342,8 +351,8 @@ func TestSpan(t *testing.T) {
 func TestCallerCorrect(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
 
 	l.Info("caller-test")
 	got := buf.String()
@@ -360,8 +369,8 @@ func TestCallerCorrect(t *testing.T) {
 func TestCallerWith(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
 
 	l.With().Str("k", "v").Info("caller-with")
 	got := buf.String()
@@ -377,9 +386,9 @@ func TestCallerWith(t *testing.T) {
 func TestSetSkip(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetSkip(1)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setSkip(1)
 
 	l.Info("skip-1")
 	got := buf.String()
@@ -393,9 +402,9 @@ func TestSetSkip(t *testing.T) {
 func TestCallerLineNum(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Info("line-test") // caller = baseLine + 1
@@ -410,9 +419,9 @@ func TestCallerLineNum(t *testing.T) {
 func TestCallerLineNumWith(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Str("k", "v").Info("line-with") // baseLine + 1
@@ -430,9 +439,9 @@ func TestCallerLineNumWith(t *testing.T) {
 func TestCallerLineNumCtx(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 
 	ctx := TraceCtx(context.Background(), "req-1")
 	_, _, baseLine, _ := runtime.Caller(0)
@@ -451,9 +460,9 @@ func TestCallerLineNumCtx(t *testing.T) {
 func TestCallerLineNumSkip(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(1)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(1)
+	l.cfg.setLevel(LINFO)
 
 	l.Info("skip-line")
 	got := buf.String()
@@ -469,9 +478,9 @@ func TestCallerLineNumSkip(t *testing.T) {
 func TestCallerLineDebug(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LDEBUG)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LDEBUG)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Debug("debug-line")
 	got := buf.String()
@@ -485,9 +494,9 @@ func TestCallerLineDebug(t *testing.T) {
 func TestCallerLineWarn(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LWARN)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LWARN)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Warn("warn-line")
 	got := buf.String()
@@ -501,9 +510,9 @@ func TestCallerLineWarn(t *testing.T) {
 func TestCallerLineError(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LERROR)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Error("error-line")
 	got := buf.String()
@@ -517,9 +526,9 @@ func TestCallerLineError(t *testing.T) {
 func TestCallerLinePrint(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Print("print-line")
 	got := buf.String()
@@ -533,9 +542,9 @@ func TestCallerLinePrint(t *testing.T) {
 func TestCallerLineFieldDebug(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LDEBUG)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LDEBUG)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Caller(true).Debug("field-debug-line")
 	got := buf.String()
@@ -552,9 +561,9 @@ func TestCallerLineFieldDebug(t *testing.T) {
 func TestCallerLineFieldInfo(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Caller(true).Info("field-info-line")
 	got := buf.String()
@@ -571,9 +580,9 @@ func TestCallerLineFieldInfo(t *testing.T) {
 func TestCallerLineFieldWarn(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LWARN)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LWARN)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Caller(true).Warn("field-warn-line")
 	got := buf.String()
@@ -590,9 +599,9 @@ func TestCallerLineFieldWarn(t *testing.T) {
 func TestCallerLineFieldError(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetSkip(0)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LERROR)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Caller(true).Error("field-error-line")
 	got := buf.String()
@@ -608,11 +617,11 @@ func TestCallerLineFieldError(t *testing.T) {
 // TestCallerLineNsInfo verifies caller line number for NsLogger.Info.
 func TestCallerLineNsInfo(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Info("ns-info-line")
 	got := buf.String()
@@ -628,11 +637,11 @@ func TestCallerLineNsInfo(t *testing.T) {
 // TestCallerLineNsDebug verifies caller line number for NsLogger.Debug.
 func TestCallerLineNsDebug(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LDEBUG)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LDEBUG)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Debug("ns-debug-line")
 	got := buf.String()
@@ -648,11 +657,11 @@ func TestCallerLineNsDebug(t *testing.T) {
 // TestCallerLineNsWarn verifies caller line number for NsLogger.Warn.
 func TestCallerLineNsWarn(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LWARN)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LWARN)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Warn("ns-warn-line")
 	got := buf.String()
@@ -668,11 +677,11 @@ func TestCallerLineNsWarn(t *testing.T) {
 // TestCallerLineNsError verifies caller line number for NsLogger.Error.
 func TestCallerLineNsError(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LERROR)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LERROR)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Error("ns-error-line")
 	got := buf.String()
@@ -688,11 +697,11 @@ func TestCallerLineNsError(t *testing.T) {
 // TestCallerLineNsWith verifies caller line number for NsLogger.With().
 func TestCallerLineNsWith(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.With().Str("k", "v").Info("ns-with-line")
 	got := buf.String()
@@ -708,11 +717,11 @@ func TestCallerLineNsWith(t *testing.T) {
 // TestCallerLineNsCtx verifies caller line number for NsLogger.Ctx().
 func TestCallerLineNsCtx(t *testing.T) {
 	var buf bytes.Buffer
-	log.SetCaller(true)
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetSkip(0)
-	l.logger.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setSkip(0)
+	l.cfg.setLevel(LINFO)
 	ctx := TraceCtx(context.Background(), "req-1")
 	_, _, baseLine, _ := runtime.Caller(0)
 	l.Ctx(ctx).Info("ns-ctx-line")
@@ -730,8 +739,8 @@ func TestCallerLineNsCtx(t *testing.T) {
 func TestLevelFilterDebug(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Debug("should-not-appear")
 	l.Debugf("should-not-appear-%d", 1)
@@ -744,8 +753,8 @@ func TestLevelFilterDebug(t *testing.T) {
 func TestLevelFilterInfo(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Debug("no")
 	l.Info("yes")
@@ -762,8 +771,8 @@ func TestLevelFilterInfo(t *testing.T) {
 func TestLevelFilterWarnError(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LWARN)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LWARN)
 
 	l.Info("no")
 	l.Debug("no2")
@@ -782,8 +791,8 @@ func TestLevelFilterWarnError(t *testing.T) {
 func TestLevelFilterErrorOnly(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LERROR)
 
 	l.Warn("no")
 	l.Error("yes-error")
@@ -800,8 +809,8 @@ func TestLevelFilterErrorOnly(t *testing.T) {
 func TestLevelNone(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LNONE)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LNONE)
 
 	l.Debug("no")
 	l.Info("no")
@@ -816,8 +825,8 @@ func TestLevelNone(t *testing.T) {
 func TestIfConditional(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().If(true).Info("yes")
 	l.With().If(false).Info("no")
@@ -834,8 +843,8 @@ func TestIfConditional(t *testing.T) {
 func TestIfErrConditional(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().IfErr(nil).Info("nil-err")
 	l.With().IfErr(errors.New("boom")).Info("has-err")
@@ -852,8 +861,8 @@ func TestIfErrConditional(t *testing.T) {
 func TestIfErrConditionalMultiLevel(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	s := l.With().IfErr(nil)
 	s.Info("no")
@@ -872,10 +881,10 @@ func TestIfErrConditionalMultiLevel(t *testing.T) {
 // TestScoper verifies Scope freezes fields into a reusable, concurrency-safe logger.
 func TestScoper(t *testing.T) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
-	s := l.With().Str("shared", "val").Scope()
+	s := l.With().Str("shared", "val").Group()
 	s.With().Str("d1", "a").Info("entry1")
 	s.With().Str("d2", "b").Info("entry2")
 	// s is persistent and reusable; no manual release needed.
@@ -886,8 +895,8 @@ func TestScoper(t *testing.T) {
 func TestFieldLoggerPrint(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().Str("k", "v").Info("p1", "p2")
 	got := buf.String()
@@ -920,8 +929,8 @@ func TestFieldLoggerPrint(t *testing.T) {
 func TestFieldLoggerPrintSkip(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().If(false).Info("should-not-appear")
 	if got := buf.String(); got != "" {
@@ -932,10 +941,10 @@ func TestFieldLoggerPrintSkip(t *testing.T) {
 // TestNsLoggerFormatted verifies NsLogger *f methods and Println/Printf.
 func TestNsLoggerFormatted(t *testing.T) {
 	var buf bytes.Buffer
-	l := Ns("svc")
-	l.logger.SetOutput(&buf)
-	l.logger.SetCaller(false)
-	l.logger.SetLevel(LDEBUG)
+	l := Trace("svc")
+	l.cfg.setOutput(&buf)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LDEBUG)
 
 	l.Debugf("debug %s", "test")
 	if got := buf.String(); !strings.Contains(got, "trace=svc") || !strings.Contains(got, "debug test") {
@@ -987,8 +996,8 @@ func TestCtxNilContext(t *testing.T) {
 func TestFieldLoggerCaller(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().Caller(true).Info("with-caller")
 	got := buf.String()
@@ -1004,7 +1013,7 @@ func TestFieldLoggerCaller(t *testing.T) {
 	}
 }
 
-// TestSetLevelPanic verifies SetLevel panics on invalid levels.
+// TestSetLevelPanic verifies SetLevel panics on an out-of-range level.
 func TestSetLevelPanic(t *testing.T) {
 	l := New(io.Discard)
 	defer func() {
@@ -1012,15 +1021,15 @@ func TestSetLevelPanic(t *testing.T) {
 			t.Fatal("SetLevel should panic on invalid level")
 		}
 	}()
-	l.SetLevel(logLevel(99))
+	l.cfg.setLevel(LNONE + 1) // beyond the sentinel → illegal
 }
 
 // TestFieldLoggerEmptyArgs verifies empty args produce message field without msg value.
 func TestFieldLoggerEmptyArgs(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.With().Info()
 	got := buf.String()
@@ -1065,8 +1074,8 @@ func TestStdWriterNilReceiver(t *testing.T) {
 func TestStdWriterLevelOff(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LERROR)
 
 	w := l.stdWriter("t")
 	n, err := w.Write([]byte("payload\n"))
@@ -1084,7 +1093,7 @@ func TestStdWriterLevelOff(t *testing.T) {
 // TestNewNilOut verifies New with nil writer defaults to Discard.
 func TestNewNilOut(t *testing.T) {
 	l := New(nil)
-	l.SetLevel(LINFO)
+	l.cfg.setLevel(LINFO)
 	l.Info("should-not-panic") // redirected to Discard, no panic
 }
 
@@ -1092,8 +1101,8 @@ func TestNewNilOut(t *testing.T) {
 func TestPrintWriter(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Print("a", "b")
 	l.Println("a", "b")
@@ -1111,26 +1120,18 @@ func TestPrintWriter(t *testing.T) {
 	}
 }
 
-// TestLoggerClose verifies Close succeeds with no file writer.
-func TestLoggerClose(t *testing.T) {
-	l := New(io.Discard)
-	if err := l.Close(); err != nil {
-		t.Fatalf("Close error: %v", err)
-	}
-}
-
 // TestSetConsNoFile verifies SetCons on a logger with no file writer returns early without panic.
 func TestSetConsNoFile(t *testing.T) {
-	l := New(io.Discard) // no SetFile → fw == nil
-	l.SetCons(true)       // should not panic, fw==nil branch
+	l := New(io.Discard)   // no SetFile → fw == nil
+	l.cfg.setConsole(true) // should not panic, fw==nil branch
 }
 
 // TestWithTrace verifies Logger.With(trace) sets the trace on the fielder.
 func TestWithTrace(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	l.With("req-abc").Str("k", "v").Info("msg")
 	if got := buf.String(); !strings.Contains(got, "trace=req-abc") {
 		t.Fatalf("With(trace) did not set trace: %s", got)
@@ -1146,9 +1147,9 @@ func TestPutflNil(t *testing.T) {
 func TestPrintbCallerRuntimeFail(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetSkip(9999) // far beyond stack depth → runtime.Caller returns !ok inside printb
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setSkip(9999) // far beyond stack depth → runtime.Caller returns !ok inside printb
 	w := l.stdWriter("ns")
 	w.Write([]byte("deep-skip-printb\n"))
 	if got := buf.String(); !strings.Contains(got, "###") {
@@ -1160,8 +1161,8 @@ func TestPrintbCallerRuntimeFail(t *testing.T) {
 func TestPrintbCallerAndAttr(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
 	// Use stdWriter which calls printb internally.
 	w := l.stdWriter("ns")
 	w.Write([]byte("hello from printb\n"))
@@ -1174,9 +1175,9 @@ func TestPrintbCallerAndAttr(t *testing.T) {
 func TestPrintbEmptyMsg(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
-	printb("", LINFO, false, l, nil, []byte{})
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
+	l.cfg.printb("", LINFO, false, nil, []byte{})
 	if got := buf.String(); strings.Contains(got, "msg=") {
 		t.Fatalf("printb with empty msg should not emit msg field: %s", got)
 	}
@@ -1186,11 +1187,11 @@ func TestPrintbEmptyMsg(t *testing.T) {
 func TestPrintbWithAttr(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	attr := getb()
 	*attr = append(*attr, []byte("key=val")...)
-	printb("", LINFO, false, l, attr, []byte("hi"))
+	l.cfg.printb("", LINFO, false, attr, []byte("hi"))
 	putb(attr)
 	if got := buf.String(); !strings.Contains(got, "key=val") {
 		t.Fatalf("printb with attr should include field: %s", got)
@@ -1202,9 +1203,9 @@ func TestPrintbWithAttr(t *testing.T) {
 func TestCallerRuntimeFail(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetSkip(9999) // skip far beyond actual stack depth → runtime.Caller returns !ok
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setSkip(9999) // skip far beyond actual stack depth → runtime.Caller returns !ok
 	l.Info("deep-skip")
 	got := buf.String()
 	if !strings.Contains(got, "###") {
@@ -1216,9 +1217,9 @@ func TestCallerRuntimeFail(t *testing.T) {
 func TestPrintfCallerRuntimeFail(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
-	l.SetSkip(9999)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
+	l.cfg.setSkip(9999)
 	l.Infof("deep-skip-f %d", 1)
 	if got := buf.String(); !strings.Contains(got, "###") {
 		t.Fatalf("expected caller=### in printf !ok branch, got: %s", got)
@@ -1228,7 +1229,7 @@ func TestPrintfCallerRuntimeFail(t *testing.T) {
 // TestPackageClose verifies package-level Close succeeds.
 func TestPackageClose(t *testing.T) {
 	// Don't actually close the package logger; test with discard only.
-	prevOut := log.out
+	prevOut := l.cfg.out
 	SetOutput(io.Discard)
 	defer SetOutput(prevOut)
 
@@ -1265,21 +1266,12 @@ func TestTraceCtxVariants(t *testing.T) {
 	}
 }
 
-// TestWriterSig verifies Logger implements io.Writer.
-func TestWriterSig(t *testing.T) {
-	l := New(io.Discard)
-	var w io.Writer = l.Writer()
-	if w == nil {
-		t.Fatal("Writer() returned nil")
-	}
-}
-
 // TestHijackStdlibCaller verifies caller is correct when stdlib log is hijacked.
 func TestHijackStdlibCaller(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
 	// Hijack is already done in New(), so we can use stdlib log directly.
 	stdlog.Print("hijack-test")
 	got := buf.String()
@@ -1300,7 +1292,7 @@ func BenchmarkParallelSpan(b *testing.B) {
 	SetOutput(io.Discard)
 	SetCaller(false)
 	ctx := TraceCtx(context.Background())
-	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Scope()
+	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Group()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -1313,8 +1305,8 @@ func BenchmarkParallelSpan(b *testing.B) {
 // BenchmarkSimple measures bare Info() with no fields and no caller.
 func BenchmarkSimple(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Info("hello world")
@@ -1324,8 +1316,8 @@ func BenchmarkSimple(b *testing.B) {
 // BenchmarkSimpleCaller measures Info() with caller stack capture.
 func BenchmarkSimpleCaller(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(true)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(true)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Info("hello world")
@@ -1335,8 +1327,8 @@ func BenchmarkSimpleCaller(b *testing.B) {
 // BenchmarkInfof measures formatted log output.
 func BenchmarkInfof(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Infof("hello %s", "world")
@@ -1346,8 +1338,8 @@ func BenchmarkInfof(b *testing.B) {
 // BenchmarkWith5Fields measures With + 5 fields + Info.
 func BenchmarkWith5Fields(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.With().
@@ -1363,8 +1355,8 @@ func BenchmarkWith5Fields(b *testing.B) {
 // BenchmarkWith10Fields measures With + 10 fields + Info.
 func BenchmarkWith10Fields(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.With().
@@ -1385,8 +1377,8 @@ func BenchmarkWith10Fields(b *testing.B) {
 // BenchmarkDisabled measures the fast path when level is filtered out.
 func BenchmarkDisabled(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LERROR) // Debug will be filtered
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LERROR) // Debug will be filtered
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.Debug("should be filtered")
@@ -1396,8 +1388,8 @@ func BenchmarkDisabled(b *testing.B) {
 // BenchmarkDisabledWithFields measures filtered With chain.
 func BenchmarkDisabledWithFields(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LERROR)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		l.With().Str("k", "v").Int("n", 1).Debug("filtered")
@@ -1407,8 +1399,8 @@ func BenchmarkDisabledWithFields(b *testing.B) {
 // BenchmarkError measures Error() with err field.
 func BenchmarkError(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LERROR)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LERROR)
 	err := errors.New("something went wrong")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -1419,8 +1411,8 @@ func BenchmarkError(b *testing.B) {
 // BenchmarkParallelSimple measures parallel bare Info().
 func BenchmarkParallelSimple(b *testing.B) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -1436,8 +1428,8 @@ func BenchmarkParallelSimple(b *testing.B) {
 func TestPrintSingleArgTypes(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	tests := []struct {
 		name string
@@ -1477,8 +1469,8 @@ func TestPrintSingleArgTypes(t *testing.T) {
 func TestPrintMultiArg(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Info("hello", "world", 42)
 	got := buf.String()
@@ -1497,8 +1489,8 @@ func TestPrintMultiArg(t *testing.T) {
 func TestPrintZeroArgs(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Info()
 	got := buf.String()
@@ -1512,8 +1504,8 @@ func TestPrintZeroArgs(t *testing.T) {
 
 func TestPrintNilArg(t *testing.T) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Info(nil)         // nil interface
 	l.Info((*int)(nil)) // typed nil
@@ -1526,8 +1518,8 @@ func (n nilStringerArg) String() string { return "nil-stringer" }
 func TestPrintStringerArg(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Info(nilStringerArg{})
 	got := buf.String()
@@ -1548,8 +1540,8 @@ func TestPrintStringerArg(t *testing.T) {
 func TestPrintVeryLongString(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	long := strings.Repeat("x", 2000)
 	l.Info(long)
@@ -1570,8 +1562,8 @@ func TestPrintSpecialChars(t *testing.T) {
 	for i, s := range tests {
 		var buf bytes.Buffer
 		l := New(&buf)
-		l.SetCaller(false)
-		l.SetLevel(LINFO)
+		l.cfg.setCaller(false)
+		l.cfg.setLevel(LINFO)
 		l.Info(s)
 		got := buf.String()
 		if !strings.Contains(got, "msg=") {
@@ -1582,10 +1574,10 @@ func TestPrintSpecialChars(t *testing.T) {
 
 func TestNsSingleArgTypes(t *testing.T) {
 	var buf bytes.Buffer
-	l := Ns("api")
-	l.logger.SetOutput(&buf)
-	l.logger.SetCaller(false)
-	l.logger.SetLevel(LINFO)
+	l := Trace("api")
+	l.cfg.setOutput(&buf)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	l.Info("hello")
 	got := buf.String()
@@ -1618,8 +1610,8 @@ func TestNsSingleArgTypes(t *testing.T) {
 func TestLoggerConcurrent(t *testing.T) {
 	stream := &blackholeStream{}
 	l := New(stream)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 
 	const goroutines = 50
 	const writes = 1000
@@ -1643,8 +1635,8 @@ func TestLoggerConcurrent(t *testing.T) {
 
 func FuzzInfo(f *testing.F) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	f.Add("hello")
 	f.Add(string([]byte{0, 1, 0xFF}))
 	f.Fuzz(func(t *testing.T, arg string) {
@@ -1657,8 +1649,8 @@ func FuzzInfo(f *testing.F) {
 
 func FuzzInfof(f *testing.F) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	f.Add("%s", "hello")
 	f.Add("%d", "42")
 	f.Fuzz(func(t *testing.T, format, arg string) {
@@ -1670,13 +1662,13 @@ func FuzzInfof(f *testing.F) {
 
 func FuzzPrintb(f *testing.F) {
 	l := New(io.Discard)
-	l.SetCaller(false)
-	l.SetLevel(LINFO)
+	l.cfg.setCaller(false)
+	l.cfg.setLevel(LINFO)
 	f.Add([]byte("hello"))
 	f.Add([]byte{0, 1, 2, 0xFF})
 	f.Fuzz(func(t *testing.T, data []byte) {
-		printb("", LINFO, false, l, nil, data)
-		printb("trace-id", LINFO, false, l, nil, data)
+		l.cfg.printb("", LINFO, false, nil, data)
+		l.cfg.printb("trace-id", LINFO, false, nil, data)
 	})
 }
 
@@ -1685,10 +1677,10 @@ func FuzzNsInfo(f *testing.F) {
 	f.Add("", "")
 	f.Add(strings.Repeat("x", 512), "msg")
 	f.Fuzz(func(t *testing.T, ns, msg string) {
-		l := Ns(ns)
-		l.logger.SetOutput(io.Discard)
-		l.logger.SetCaller(false)
-		l.logger.SetLevel(LINFO)
+		l := Trace(ns)
+		l.cfg.setOutput(io.Discard)
+		l.cfg.setCaller(false)
+		l.cfg.setLevel(LINFO)
 		l.Info(msg)
 		l.Info(msg, 42)
 	})

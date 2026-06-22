@@ -66,7 +66,7 @@ func Example_fieldError() {
 // Example: Scope freezes a field chain into a reusable ScopeLogger.
 func Example_fieldScope() {
 	l := logs.New(nil)
-	base := l.With().Str("app", "myapp").Str("env", "prod").Scope()
+	base := l.With().Str("app", "myapp").Str("env", "prod").Group()
 
 	// base is persistent; derive a one-shot fielder via With for each entry
 	base.With().Int("step", 1).Info("first step")

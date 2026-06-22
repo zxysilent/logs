@@ -239,3 +239,69 @@ func FuzzPutAny(f *testing.F) {
 		_ = PutAny(nil, []string{"a", "b"})
 	})
 }
+
+// TestPutKeyNonEmptyDst covers the leading-space branch when dst is non-empty.
+func TestPutKeyNonEmptyDst(t *testing.T) {
+	if got := string(PutKey([]byte("a=1"), "b")); got != "a=1 b=" {
+		t.Fatalf("PutKey non-empty dst: %q", got)
+	}
+	if got := string(PutKeyRaw([]byte("a=1"), "b")); got != "a=1 b=" {
+		t.Fatalf("PutKeyRaw non-empty dst: %q", got)
+	}
+	if got := string(PutKey([]byte("a=1"), "b c")); got != `a=1 "b c"=` {
+		t.Fatalf("PutKey non-empty dst quoted: %q", got)
+	}
+}
+
+// TestAppendIntGeneral covers the non-specialized appendInt paths:
+// negative numbers, widths other than 2/4, zero, and buffer growth.
+func TestAppendIntGeneral(t *testing.T) {
+	tests := []struct {
+		x     int
+		width int
+		want  string
+	}{
+		{0, 0, "0"},
+		{0, 3, "000"},
+		{5, 3, "005"},
+		{-7, 2, "-07"},
+		{-123, 0, "-123"},
+		{12345, 4, "12345"}, // width 4 but value >= 1e4 -> general path
+		{42, 6, "000042"},
+		{100, 2, "100"}, // width 2 but value >= 1e2 -> general path
+	}
+	for _, tt := range tests {
+		if got := string(appendInt(nil, tt.x, tt.width)); got != tt.want {
+			t.Errorf("appendInt(%d, %d) = %q, want %q", tt.x, tt.width, got, tt.want)
+		}
+	}
+	// Append onto an existing slice with spare capacity to exercise the
+	// len(b)+n <= cap(b) growth branch.
+	buf := make([]byte, 0, 16)
+	buf = append(buf, "n="...)
+	buf = appendInt(buf, 98765, 0)
+	if string(buf) != "n=98765" {
+		t.Fatalf("appendInt onto buffer: %q", buf)
+	}
+}
+
+// TestPutStringQuoteEscapeNoSpace documents the contract: strings containing
+// escapable chars (",\n,\) but no space/tab are escaped but NOT wrapped in quotes.
+func TestPutStringQuoteEscapeNoSpace(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{`a"b`, `a\"b`},
+		{"a\nb", `a\nb`},
+		{`a\b`, `a\\b`},
+		{"plain", "plain"},
+		{"with space", `"with space"`},
+	}
+	for _, tt := range tests {
+		if got := string(PutStringQuote(nil, tt.in)); got != tt.want {
+			t.Errorf("PutStringQuote(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+		if got := string(PutBytesQuote(nil, []byte(tt.in))); got != tt.want {
+			t.Errorf("PutBytesQuote(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+

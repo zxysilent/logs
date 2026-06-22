@@ -4,12 +4,12 @@
 
 ## 特性
 
-- **四级日志**：`DEBUG` `INFO` `WARN` `ERROR`
+- **四级日志**：`DEBUG` `INFO` `WARN` `ERROR`（数值对齐 `log/slog`：-4/0/4/8）
 - **自建实例或全局默认**：`logs.New(w)` 或直接用包级函数
 - **结构化字段链**：`With().Str("k","v").Int("n",1).Info()`
-- **命名空间 (Ns)**：`Ns("api").Info()` → `trace=api`
+- **命名空间 (Trace)**：`Trace("api").Info()` → `trace=api`
 - **链路追踪**：`TraceCtx` / `TraceId` / `Ctx`
-- **自动劫持标准库** `log`：`New()` 自动转换 stdlog → logfmt
+- **自动劫持标准库** `log`：`New()` 自动转换 stdlog → logfmt（可用 `WithHijack(false)` 关闭）
 - **兼容标准库签名**：`Print/Printf/Println`
 - **写入文件**：按天切分，可设最大天数/单文件大小，默认同时输出控制台，也可关闭
 - **高性能**：关键路径零分配，`sync.Pool` 复用 buffer
@@ -34,8 +34,8 @@ func main() {
     logs.SetCaller(true)
     logs.Info("hello world")
 
-    // === 命名空间 (Ns) ===
-    apiLog := logs.Ns("api")
+    // === 命名空间 (Trace) ===
+    apiLog := logs.Trace("api")
     apiLog.Info("server started")                  // trace=api
     ctx := logs.TraceCtx(context.Background(), "req-1")
     apiLog.Ctx(ctx).Info("handle")                 // trace=api.req-1
@@ -56,12 +56,9 @@ func main() {
     stdlog.Println("auto hijacked to logfmt")      // New() 自动劫持
 
     // === 自定义实例 (文件输出) ===
-    applog := logs.New(nil)
-    applog.SetFile("./logs/app.log")
-    applog.SetCons(true)   // 同时输出控制台
-    applog.SetMaxAge(7)    // 保留 7 天
-    applog.SetMaxSize(64)  // 单文件最大 64MB
-    defer applog.Close()
+    w, closeFn := logs.NewFile("./logs/app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+    defer closeFn()
+    applog := logs.New(w, logs.WithLevel(logs.LINFO))
     applog.Info("app started")
 }
 ```
@@ -72,25 +69,29 @@ func main() {
 
 ### 日志等级
 
+数值对齐 `log/slog`（越大越严重）。
+
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `logs.LDEBUG` | 0 | 调试 |
-| `logs.LINFO` | 1 | 常规 |
-| `logs.LWARN` | 2 | 警告 |
-| `logs.LERROR` | 3 | 错误 |
-| `logs.LNONE` | 4 | 关闭 |
+| `logs.LDEBUG` | -4 | 调试 |
+| `logs.LINFO` | 0 | 常规 |
+| `logs.LWARN` | 4 | 警告 |
+| `logs.LERROR` | 8 | 错误 |
+| `logs.LNONE` | 哨兵 | 关闭全部输出 |
+
+> 另提供 `LevelDebug` / `LevelInfo` / `LevelWarn` / `LevelError` / `LevelNone` 别名。
 
 ### 全局函数（操作默认实例）
 
 ```go
-logs.SetLevel(lv logLevel)                          // 设置等级
+logs.SetLevel(lv Level)                             // 设置等级
 logs.SetCaller(b bool)                              // 开启/关闭调用行号
 logs.SetSep(sep ...string)                          // 路径分隔符，默认 "/"（取最靠后的匹配）
 logs.SetSkip(skip int)                              // 额外跳帧
 logs.SetOutput(out io.Writer)                       // 设置输出
 logs.SetFile(path string)                           // 设置文件输出
-logs.SetMaxAge(ma int)                              // 最大保留天数，默认 31
-logs.SetMaxSize(ms int64)                           // 单文件最大容量(MB)，默认 64
+logs.SetMaxAge(ma int)                              // 最大保留天数，默认 64
+logs.SetMaxSize(ms int64)                           // 单文件最大容量(MiB)，默认 64
 logs.SetCons(b bool)                                // 同时输出控制台
 logs.Close() error                                  // 关闭
 
@@ -113,41 +114,54 @@ logs.Printf(format string, args ...any)
 logs.With(trace ...string) *fielder
 logs.Ctx(ctx context.Context) *fielder
 
-// 命名空间
-logs.Ns(ns string) *ScopeLogger
+// 命名空间 / 子 Logger
+logs.Trace(trace string) *Logger    // 命名空间子 Logger
+logs.Clone() *Logger                // 保留 ns/字段的子 Logger
 ```
 
 ### Logger（自建实例）
 
+`New` 创建的 Logger 通过函数式选项一次性配置，之后**不可变**（没有 `Set*` 方法）。
+如需运行期修改配置，请使用包级默认实例。
+
 ```go
-l := logs.New(w io.Writer) // w 为 nil 时 Discard
-// 所有全局函数对应的同名方法
-l.SetLevel(lv)  l.SetCaller(b)  l.SetSep(s)  l.SetSkip(n)
-l.SetOutput(w)  l.SetFile(p)    l.SetMaxAge(d) l.SetMaxSize(s)
-l.SetCons(b)    l.Close()
+// 用选项构造（out 为 nil 时 Discard）
+l := logs.New(w,
+    logs.WithLevel(logs.LDEBUG),
+    logs.WithCaller(true),
+    logs.WithSep("/internal", "/"),
+    logs.WithSkip(0),
+)
+
+// 文件输出：NewFile 返回 Writer + 关闭句柄，可选 MaxAge/MaxSize/Cons
+w, closeFn := logs.NewFile("app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+defer closeFn()
+fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
 l.Warn(...)   l.Warnf(...)   l.Error(...) l.Errorf(...)
 l.Print(...)  l.Println(...) l.Printf(...)
 l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
-l.Ns(ns string) *ScopeLogger
-l.Writer() io.Writer     // 返回 io.Writer，输出 logfmt
+l.Trace(trace string) *Logger      // 命名空间子 Logger（共享根配置）
+l.Clone() *Logger                  // 保留 ns/字段的子 Logger（共享根配置）
 ```
 
-### ScopeLogger（可复用的命名空间 / 字段作用域）
+### 命名空间 / 子 Logger
+
+`Trace`/`Clone` 派生共享父级根 `Config` 的子 `Logger`。
 
 ```go
-api := logs.Ns("api")            // *ScopeLogger，trace=api
-api.Debug(...)  api.Debugf(...)  api.Info(...)  api.Infof(...)
-api.Warn(...)   api.Warnf(...)   api.Error(...) api.Errorf(...)
-api.Print(...)  api.Println(...) api.Printf(...)
+api := logs.Trace("api")         // *Logger，trace=api
+pay := api.Trace("pay")          // *Logger，trace=api.pay（嵌套）
+api.Debug(...)  api.Info(...)  api.Warn(...)  api.Error(...)  api.Print(...)
 api.With() *fielder              // 派生一次性 fielder，继承 attr+trace
 api.Ctx(ctx context.Context) *fielder
 // trace = ns（无 ctx）或 ns.trace（有 ctx）
 
-// 将字段链固化为持久、可复用、并发安全的 ScopeLogger：
-base := logs.With().Str("svc", "api").Int("pid", 1).Scope() // *ScopeLogger
+// 将字段链固化为持久、可复用、并发安全的 *Logger：
+base := logs.With().Str("svc", "api").Int("pid", 1).Group() // *Logger
 base.Info("started")             // svc=api pid=1，不释放，可复用
 base.With().Int("uid", 9).Info("login")
+```
 ```
 
 ### fielder（结构化字段 + 输出控制）
@@ -169,8 +183,8 @@ fl.Any(key string, i any)        fl.Raw(key string, b []byte)
 fl.If(b bool)                    // 条件输出
 fl.Caller(b bool)                // 每条单独控制 caller
 
-// 固化为可复用的 ScopeLogger
-fl.Scope() *ScopeLogger               // 持久化字段链（无需手动释放）
+// 固化为可复用的 *Logger
+fl.Group() *Logger                    // 持久化字段链（无需手动释放）
 
 // 终端方法（调用后 fielder 被回收）
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
@@ -202,10 +216,6 @@ stdlog.Println("hello")       // output: trace=myprefix level=INF msg=hello
 // Print 兼容 — 包级 Print/Printf/Println → logfmt
 logs.Print("a", "b")          // msg=ab
 logs.Printf("%s:%d", "k", 1)  // msg=k:1
-
-// Writer — 返回 io.Writer，适合桥接第三方库
-w := l.Writer()
-w.Write([]byte("raw message"))
 ```
 
 ---

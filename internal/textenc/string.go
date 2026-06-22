@@ -68,9 +68,8 @@ func PutStringer(dst []byte, val fmt.Stringer) []byte {
 	return PutStringQuote(dst, val.String())
 }
 
-// // appendStringComplex is used by appendString to take over an in
-// progress JSON string encoding that encountered a character that needs
-// to be encoded.
+// appendStringComplex takes over from quoteString when a character that
+// needs escaping is encountered, encoding the remainder byte-by-byte.
 func appendStringComplex(dst []byte, s string, i int) []byte {
 	start := 0
 	for i < len(s) {

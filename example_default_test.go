@@ -28,9 +28,9 @@ func Example_defaultSetCaller() {
 
 // Example: SetLevel filters log output.
 func Example_defaultSetLevel() {
-	logs.SetLevel(logs.LDEBUG)
+	logs.SetLevel(logs.LevelDebug)
 	logs.Debug("visible when level is DEBUG")
-	logs.SetLevel(logs.LWARN)
+	logs.SetLevel(logs.LevelWarn)
 	logs.Debug("not visible, level is WARN")
 	logs.Warn("visible, level is WARN")
 	// Output:

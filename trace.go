@@ -13,6 +13,7 @@ const (
 	traceSize = 8                                  //6-12
 )
 
+// trace generates a random base-32 id of traceSize bytes.
 func trace() string {
 	buf := make([]byte, traceSize)
 	for idx, cache := 0, fastrand(); idx < traceSize; {
@@ -23,26 +24,29 @@ func trace() string {
 	return unsafe.String(&buf[0], len(buf))
 }
 
+// TraceId generates a new random trace id.
 func TraceId() string {
 	return trace()
 }
 
+// TraceOf returns the trace id stored in ctx, or empty string if none.
 func TraceOf(ctx context.Context) string {
 	traceId, _ := ctx.Value(traceKey).(string)
 	return traceId
 }
 
+// fastrand is linked to the runtime's fast PRNG.
+//
 //go:linkname fastrand runtime.fastrand64
 func fastrand() uint64
 
+// ctxKey is the private context key type for storing the trace id.
 type ctxKey struct{}
 
+// traceKey is the context key used to store and retrieve the trace id.
 var traceKey = ctxKey{}
 
-// TraceCtx 处理traceid并返回新的context
-// 1. ctx存在traceid，traceid参数不存在/为空 → 复用原有traceid
-// 2. ctx不存在traceid → 使用新值（传入的traceid或生成新的）
-// 3. ctx存在traceid且traceid参数存在 → 追加（原有值.新traceid）
+// TraceCtx processes traceid and returns a new context.
 func TraceCtx(ctx context.Context, traceid ...string) context.Context {
 	ntraceid := ""
 	if len(traceid) > 0 {

@@ -9,9 +9,9 @@ import (
 )
 
 func TestName2time(t *testing.T) {
-	f := New("../../logs/app.log")
+	f := New("../../logs/app.log", false)
 	t.Logf("%+v", f)
-	f.delete()
+	f.delete(f.maxage)
 }
 
 func TestReadDir(t *testing.T) {
@@ -26,11 +26,11 @@ func TestReadDir(t *testing.T) {
 func TestWriterLifecycle(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path)
+	w := New(path, false)
 	defer w.Close()
 
-	w.SetCons(false)
-	if w.cons {
+	w.SetConsole(false)
+	if w.console {
 		t.Fatalf("SetCons(false) not applied")
 	}
 
@@ -87,7 +87,7 @@ func TestWriterLifecycle(t *testing.T) {
 		t.Fatalf("create stale file failed: %v", err)
 	}
 	w.maxage = 1
-	w.delete()
+	w.delete(w.maxage)
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Fatalf("stale file should be deleted, err=%v", err)
 	}
@@ -101,7 +101,7 @@ func TestWriterLifecycle(t *testing.T) {
 func TestWriteSizeRotate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path)
+	w := New(path, false)
 	defer w.Close()
 
 	// 1 MiB cap; write enough to exceed it and force a size-based rotate.
@@ -134,7 +134,7 @@ func TestWriteSizeRotate(t *testing.T) {
 func TestWriteCrossDayRotate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path)
+	w := New(path, false)
 	defer w.Close()
 
 	// First write establishes the current file and its creation date.
@@ -167,7 +167,7 @@ func TestWriteCrossDayRotate(t *testing.T) {
 func TestWriteAfterClose(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path)
+	w := New(path, false)
 
 	if _, err := w.Write([]byte("before close\n")); err != nil {
 		t.Fatalf("write before close failed: %v", err)
@@ -180,6 +180,46 @@ func TestWriteAfterClose(t *testing.T) {
 	}
 }
 
+// TestCloseIdempotent verifies Close is safe to call multiple times.
+func TestCloseIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path, false)
+
+	if _, err := w.Write([]byte("data\n")); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("first close failed: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("second close should be idempotent, got: %v", err)
+	}
+}
+
+// TestRotateFallbackOnRenameFailure verifies rotate continues even if rename fails.
+func TestRotateFallbackOnRenameFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	w := New(path, false)
+	defer w.Close()
+
+	// Write something to create the file.
+	if _, err := w.Write([]byte("first\n")); err != nil {
+		t.Fatalf("first write failed: %v", err)
+	}
+	// Remove the directory to force rename to fail.
+	os.RemoveAll(dir)
+	// rotate should still create a new file (fallback).
+	if err := w.rotate(); err != nil {
+		t.Fatalf("rotate should not fail even when rename fails: %v", err)
+	}
+	// The new file should exist because rotate recreates it.
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("new file should exist after rotate fallback: %v", err)
+	}
+}
+
 // TestWriteCons verifies cons=true also writes to stderr without error.
 func TestWriteCons(t *testing.T) {
 	dir := t.TempDir()
@@ -187,7 +227,7 @@ func TestWriteCons(t *testing.T) {
 	w := New(path, true)
 	defer w.Close()
 
-	if !w.cons {
+	if !w.console {
 		t.Fatalf("cons should be true")
 	}
 	if _, err := w.Write([]byte("to file and stderr\n")); err != nil {

@@ -23,10 +23,10 @@ var _ io.WriteCloser = (*Writer)(nil)
 type Writer struct {
 	maxage  int       // 最大保留天数
 	maxsize int64     // 单个日志最大容量 默认 64MB
+	console bool      // 标准输出  默认false
 	size    int64     // 累计大小
-	cons    bool      // 标准输出  默认false
-	fpath   string    // 文件目录 完整路径 fpath=fdir+fname+fsuffix
-	fdir    string    //
+	fpath   string    // 完整路径 fpath=fdir+fname+fsuffix
+	fdir    string    // 文件目录
 	fname   string    // 文件名
 	fsuffix string    // 文件后缀名 默认 .log
 	created time.Time // 文件创建日期
@@ -39,16 +39,12 @@ type Writer struct {
 	closed  int32 // 0 = open, 1 = closed
 }
 
-func New(path string, cons ...bool) *Writer {
-	consv := false
-	if len(cons) > 0 {
-		consv = cons[0]
-	}
+func New(path string, cons bool) *Writer {
 	w := &Writer{
-		fpath: path, //dir1/dir2/app.log
-		mu:    sync.Mutex{},
-		cons:  consv,
-		done:  make(chan struct{}),
+		fpath:   path, //dir1/dir2/app.log
+		mu:      sync.Mutex{},
+		console: cons,
+		done:    make(chan struct{}),
 	}
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2
 	w.fsuffix = filepath.Ext(w.fpath)                               //.log
@@ -58,11 +54,12 @@ func New(path string, cons ...bool) *Writer {
 	}
 	w.maxsize = sizeMiB * defMaxsize
 	w.maxage = defMaxage
-	os.MkdirAll(filepath.Dir(w.fpath), 0755)
+	os.MkdirAll(w.fdir, 0755)
 	w.tk = time.NewTicker(time.Second * 5)
 	go w.daemon()
 	return w
 }
+
 func (w *Writer) daemon() {
 	for {
 		select {
@@ -77,8 +74,8 @@ func (w *Writer) daemon() {
 // SetMaxAge 最大保留天数
 func (w *Writer) SetMaxAge(ma int) {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.maxage = ma
-	w.mu.Unlock()
 }
 
 // SetMaxSize 单个日志最大容量MiB
@@ -87,15 +84,15 @@ func (w *Writer) SetMaxSize(ms int64) {
 		return
 	}
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.maxsize = ms * sizeMiB
-	w.mu.Unlock()
 }
 
-// SetCons 同时输出控制台
-func (w *Writer) SetCons(b bool) {
+// SetConsole 同时输出控制台
+func (w *Writer) SetConsole(b bool) {
 	w.mu.Lock()
-	w.cons = b
-	w.mu.Unlock()
+	defer w.mu.Unlock()
+	w.console = b
 }
 
 func (w *Writer) equaldate(file []byte, msg []byte) bool {
@@ -109,7 +106,7 @@ func (w *Writer) equaldate(file []byte, msg []byte) bool {
 func (w *Writer) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.cons {
+	if w.console {
 		os.Stderr.Write(p)
 	}
 	if atomic.LoadInt32(&w.closed) != 0 {
@@ -123,7 +120,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	}
 	// 按天切割
 	if !w.equaldate(w.creates, p) { //2023-04-05
-		go w.delete() // 每天检测一次旧文件
+		go w.delete(w.maxage) // 每天检测一次旧文件
 		if err := w.rotate(); err != nil {
 			return 0, err
 		}
@@ -172,14 +169,11 @@ func (w *Writer) rotate() error {
 }
 
 // 删除旧日志
-func (w *Writer) delete() {
-	w.mu.Lock()
-	maxage := w.maxage
-	w.mu.Unlock()
+func (w *Writer) delete(maxage int) {
 	if maxage <= 0 {
 		return
 	}
-	dir := filepath.Dir(w.fpath)
+	dir := w.fdir
 	fakeNow := time.Now().AddDate(0, 0, -maxage)
 	dirs, err := os.ReadDir(dir)
 	if err != nil {
@@ -197,6 +191,7 @@ func (w *Writer) delete() {
 		}
 	}
 }
+
 func (w *Writer) name2time(name string) (time.Time, error) {
 	name = strings.TrimPrefix(name, filepath.Base(w.fname))
 	name = strings.TrimSuffix(name, w.fsuffix)

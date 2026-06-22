@@ -39,19 +39,11 @@ func Example_stdlibHijackCaller() {
 func Example_stdlibHijackPrefix() {
 	// Set stdlib prefix before creating the logger
 	stdlog.SetPrefix("myprefix")
-	l := logs.New(os.Stderr) // hijackstd reads prefix as namespace
-	l.SetCaller(false)
+	l := logs.New(os.Stderr, logs.WithCaller(false)) // hijackstd reads prefix as namespace
+	_ = l
 	defer stdlog.SetPrefix("") // restore
 
 	stdlog.Println("message with ns")
-	// Output:
-}
-
-// Example: Writer returns an io.Writer that writes logfmt lines.
-func Example_stdlibWriter() {
-	l := logs.New(os.Stderr)
-	w := l.Writer()
-	_, _ = w.Write([]byte("hello from writer"))
 	// Output:
 }
 
