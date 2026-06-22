@@ -268,16 +268,19 @@ func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
 ```
 pkg: github.com/zxysilent/logs
 cpu: 12th Gen Intel(R) Core(TM) i5-12500H
+count: 3 轮平均值
 
-BenchmarkDisabled        0.5 ns/op,   0 B/op, 0 allocs   // 过滤快速路径
-BenchmarkParallelSimple   13 ns/op,   0 B/op, 0 allocs   // 并行裸输出
-BenchmarkParallelSpan     64 ns/op,   0 B/op, 0 allocs   // 并行作用域派生+输出
-BenchmarkSimple           69 ns/op,   0 B/op, 0 allocs   // 基础 Info()
-BenchmarkParallel         88 ns/op,   0 B/op, 0 allocs   // 并行 With 7 字段
-BenchmarkInfof           123 ns/op,  16 B/op, 1 allocs   // 格式化输出
-BenchmarkError           167 ns/op,   0 B/op, 0 allocs   // Error 日志
-BenchmarkWith5Fields     282 ns/op,   0 B/op, 0 allocs   // 5 个结构化字段
-BenchmarkWith10Fields    430 ns/op,   0 B/op, 0 allocs   // 10 个结构化字段
+BenchmarkDisabled         1.2 ns/op,   0 B/op, 0 allocs   // 过滤快速路径
+BenchmarkParallelSimple    11 ns/op,   0 B/op, 0 allocs   // 并行裸输出
+BenchmarkParallelSpan      64 ns/op,   0 B/op, 0 allocs   // 并行 Trace+输出
+BenchmarkParallel          58 ns/op,   0 B/op, 0 allocs   // 并行 With 7 字段
+BenchmarkSimple            76 ns/op,   0 B/op, 0 allocs   // 基础 Info()
+BenchmarkError            139 ns/op,   0 B/op, 0 allocs   // Error 日志
+BenchmarkInfof            139 ns/op,  16 B/op, 1 allocs   // 格式化输出
+BenchmarkWith5Fields      213 ns/op,   0 B/op, 0 allocs   // 5 个结构化字段
+BenchmarkWith10Fields     310 ns/op,   0 B/op, 0 allocs   // 10 个结构化字段
+BenchmarkSimpleCaller     491 ns/op,   0 B/op, 0 allocs   // Info + caller
+BenchmarkParallelFile     346 ns/op,   0 B/op, 0 allocs   // 并行写入文件
 ```
 
 ### 优化要点

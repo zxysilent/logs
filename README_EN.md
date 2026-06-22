@@ -267,16 +267,19 @@ func (rh *repoHook) AfterProcess(ctx *contexts.ContextHook) error {
 ```
 pkg: github.com/zxysilent/logs
 cpu: 12th Gen Intel(R) Core(TM) i5-12500H
+count: average of 3 runs
 
-BenchmarkSimple           95 ns/op,   0 B/op, 0 allocs
-BenchmarkInfof           158 ns/op,  16 B/op, 1 allocs
-BenchmarkWith5Fields     296 ns/op,   0 B/op, 0 allocs
-BenchmarkWith10Fields    539 ns/op,   0 B/op, 0 allocs
-BenchmarkError           192 ns/op,   0 B/op, 0 allocs
-BenchmarkDisabled        0.5 ns/op,   0 B/op, 0 allocs
-BenchmarkParallelSimple   14 ns/op,   0 B/op, 0 allocs
-BenchmarkParallel         97 ns/op,   0 B/op, 0 allocs
-BenchmarkParallelSpan     80 ns/op,   0 B/op, 0 allocs
+BenchmarkDisabled         1.2 ns/op,   0 B/op, 0 allocs   // level filter fast path
+BenchmarkParallelSimple    11 ns/op,   0 B/op, 0 allocs   // parallel bare output
+BenchmarkParallelSpan      64 ns/op,   0 B/op, 0 allocs   // parallel Trace + output
+BenchmarkParallel          58 ns/op,   0 B/op, 0 allocs   // parallel With 7 fields
+BenchmarkSimple            76 ns/op,   0 B/op, 0 allocs   // basic Info()
+BenchmarkError            139 ns/op,   0 B/op, 0 allocs   // Error log
+BenchmarkInfof            139 ns/op,  16 B/op, 1 allocs   // formatted output
+BenchmarkWith5Fields      213 ns/op,   0 B/op, 0 allocs   // 5 structured fields
+BenchmarkWith10Fields     310 ns/op,   0 B/op, 0 allocs   // 10 structured fields
+BenchmarkSimpleCaller     491 ns/op,   0 B/op, 0 allocs   // Info + caller
+BenchmarkParallelFile     346 ns/op,   0 B/op, 0 allocs   // parallel file write
 ```
 
 ### Optimizations

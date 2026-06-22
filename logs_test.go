@@ -240,15 +240,15 @@ func BenchmarkParallel(b *testing.B) {
 	}
 }
 func BenchmarkLog(b *testing.B) {
-	l := New(os.Stdout)
-	l.cfg.setFile("./logs/app.log")
+	l := New(nil) // no console/file output
 	for i := 0; i < b.N; i++ {
 		l.Info()
 	}
 }
 func BenchmarkParallelFile(b *testing.B) {
-	logger := New(nil)
-	logger.cfg.setFile("./logs/app.log")
+	w, closeFn := NewFile("./logs/app.log", WithConsole(false))
+	defer closeFn()
+	logger := New(w)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
