@@ -59,10 +59,7 @@ func TestPackagePrintCompat(t *testing.T) {
 
 func TestTraceRootTrace(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false)).Trace("myapp")
 	l.Info("hello")
 	got := buf.String()
 	if !strings.Contains(got, "trace=myapp") {
@@ -72,10 +69,7 @@ func TestTraceRootTrace(t *testing.T) {
 
 func TestTraceSubTrace(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false)).Trace("myapp")
 	ctx := TraceCtx(context.Background(), "req-1")
 	l.Ctx(ctx).Info("sub")
 	got := buf.String()
@@ -86,10 +80,7 @@ func TestTraceSubTrace(t *testing.T) {
 
 func TestTraceEmptyCtx(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false)).Trace("myapp")
 	l.Ctx(context.Background()).Info("x")
 	got := buf.String()
 	if !strings.Contains(got, "trace=myapp") {
@@ -102,10 +93,7 @@ func TestTraceEmptyCtx(t *testing.T) {
 
 func TestTraceWithFields(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("svc")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false)).Trace("svc")
 	l.With().Str("k", "v").Info("x")
 	got := buf.String()
 	if !strings.Contains(got, "trace=svc") {
@@ -115,10 +103,7 @@ func TestTraceWithFields(t *testing.T) {
 
 func TestTraceLevelFilter(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("svc")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LWARN)
+	l := New(&buf, WithCaller(false), WithLevel(LevelWarn)).Trace("svc")
 	l.Info("no")
 	l.Warn("yes")
 	got := buf.String()
@@ -132,10 +117,7 @@ func TestTraceLevelFilter(t *testing.T) {
 
 func TestTracePrint(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("api")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false)).Trace("api")
 	l.Print("a", "b")
 	got := buf.String()
 	if !strings.Contains(got, "trace=api") {
@@ -148,9 +130,7 @@ func TestTracePrint(t *testing.T) {
 
 func TestTraceNoTrace(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 	l.Info("no trace")
 	got := buf.String()
 	if strings.Contains(got, "trace=") {
@@ -160,9 +140,7 @@ func TestTraceNoTrace(t *testing.T) {
 
 func TestStdWriterDirectWrite(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setLevel(LINFO)
-	l.cfg.setCaller(false)
+	l := New(&buf, WithCaller(false))
 
 	writer := l.stdWriter("ns-x")
 	if _, err := writer.Write([]byte("ns-xpayload\n")); err != nil {
@@ -180,9 +158,7 @@ func TestStdWriterDirectWrite(t *testing.T) {
 
 func TestStdWriterLevelFilter(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setLevel(LERROR)
-	l.cfg.setCaller(false)
+	l := New(&buf, WithCaller(false), WithLevel(LevelError))
 
 	writer := l.stdWriter("ns")
 	if _, err := writer.Write([]byte("nspayload\n")); err != nil {
@@ -195,11 +171,7 @@ func TestStdWriterLevelFilter(t *testing.T) {
 
 func TestTraceCallerLine(t *testing.T) {
 	var buf bytes.Buffer
-	l.cfg.setCaller(true)
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setSkip(0)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(true), WithSkip(0)).Trace("myapp")
 
 	l.Info("caller-line")
 	got := buf.String()
@@ -217,11 +189,7 @@ func TestTraceCallerLine(t *testing.T) {
 
 func TestTraceCallerWith(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(true)
-	l.cfg.setSkip(0)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(true), WithSkip(0)).Trace("myapp")
 
 	l.With().Str("k", "v").Info("caller-with")
 	got := buf.String()
@@ -238,11 +206,7 @@ func TestTraceCallerWith(t *testing.T) {
 
 func TestTraceCallerCtx(t *testing.T) {
 	var buf bytes.Buffer
-	l := Trace("myapp")
-	l.cfg.setOutput(&buf)
-	l.cfg.setCaller(true)
-	l.cfg.setSkip(0)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(true), WithSkip(0)).Trace("myapp")
 
 	ctx := TraceCtx(context.Background(), "req-1")
 	l.Ctx(ctx).Info("caller-ctx")
@@ -260,9 +224,7 @@ func TestTraceCallerCtx(t *testing.T) {
 
 func TestStdLoggerWithTraceCtx(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setLevel(LINFO)
-	l.cfg.setCaller(false)
+	l := New(&buf, WithCaller(false))
 
 	ctx := TraceCtx(context.Background(), "trace-ctx")
 	l.Ctx(ctx).Info("ctx")

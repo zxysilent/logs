@@ -11,9 +11,7 @@ import (
 // TestGroupFromFielder verifies fielder.Group() freezes preset fields and is reusable.
 func TestGroupFromFielder(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	sc := l.With().Str("svc", "api").Int("pid", 1).Group()
 
@@ -42,9 +40,7 @@ func TestGroupFromFielder(t *testing.T) {
 // TestGroupWithDerive verifies With derives a one-shot fielder inheriting preset fields.
 func TestGroupWithDerive(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	sc := l.With().Str("base", "b").Group()
 
@@ -70,9 +66,7 @@ func TestGroupWithDerive(t *testing.T) {
 // TestLoggerCloneEmpty verifies Clone() creates an empty reusable logger.
 func TestLoggerCloneEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	sc := l.Clone()
 	buf.Reset()
@@ -89,9 +83,7 @@ func TestLoggerCloneEmpty(t *testing.T) {
 // TestLoggerTrace verifies Logger.Trace sets the trace field.
 func TestLoggerTrace(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	sc := l.Trace("api")
 	buf.Reset()
@@ -106,9 +98,7 @@ func TestLoggerTrace(t *testing.T) {
 // Clone(trace) appends to it (and Clone() with no args is a pure copy).
 func TestTraceReplaceCloneAppend(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	// Trace replaces: api -> svc (not api.svc)
 	buf.Reset()
@@ -142,9 +132,7 @@ func TestTraceReplaceCloneAppend(t *testing.T) {
 // TestGroupWithTraceJoin verifies With(trace) joins with the logger namespace.
 func TestGroupWithTraceJoin(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	// namespace + sub trace -> ns.sub
 	buf.Reset()
@@ -171,9 +159,7 @@ func TestGroupWithTraceJoin(t *testing.T) {
 // TestGroupCtxTraceJoin verifies Ctx joins namespace with the context trace id.
 func TestGroupCtxTraceJoin(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	ctx := TraceCtx(context.Background(), "req9")
 
@@ -202,7 +188,6 @@ func TestGroupCtxTraceJoin(t *testing.T) {
 func TestGroupCallerFollowsConfig(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf)
-	l.cfg.setLevel(LINFO)
 
 	l.cfg.setCaller(true)
 	sc := l.Trace("api") // shares root cfg
@@ -224,9 +209,7 @@ func TestGroupCallerFollowsConfig(t *testing.T) {
 // TestGroupLevels verifies level gating across all level methods.
 func TestGroupLevels(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LWARN)
+	l := New(&buf, WithCaller(false), WithLevel(LevelWarn))
 
 	sc := l.Clone()
 	buf.Reset()
@@ -246,9 +229,7 @@ func TestGroupLevels(t *testing.T) {
 // TestGroupFormatted verifies the *f methods.
 func TestGroupFormatted(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LDEBUG)
+	l := New(&buf, WithCaller(false), WithLevel(LevelDebug))
 
 	sc := l.Clone()
 	buf.Reset()
@@ -260,9 +241,7 @@ func TestGroupFormatted(t *testing.T) {
 
 // TestGroupConcurrent verifies a Group logger is safe under concurrent use.
 func TestGroupConcurrent(t *testing.T) {
-	l := New(nil) // Discard
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(nil, WithCaller(false)) // Discard
 
 	sc := l.With().Str("shared", "v").Group()
 

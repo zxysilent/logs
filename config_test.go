@@ -45,7 +45,7 @@ func TestNewDefaultsNilOut(t *testing.T) {
 // changing the root config affects all derived loggers.
 func TestConfigSharedAcrossTrace(t *testing.T) {
 	var buf bytes.Buffer
-	root := New(&buf, WithLevel(LINFO))
+	root := New(&buf)
 	api := root.Trace("api")
 	pay := api.Clone("pay") // Clone appends -> api.pay
 
@@ -91,7 +91,7 @@ func TestSetFile(t *testing.T) {
 func TestNewFile(t *testing.T) {
 	dir := t.TempDir()
 	w, closeFn := NewFile(dir+"/app.log", WithMaxAge(7), WithMaxSize(2), WithConsole(false))
-	l := New(w, WithLevel(LINFO))
+	l := New(w)
 	l.Info("hello file")
 
 	// close handle works and is idempotent (multiple calls → nil, no panic).
@@ -128,9 +128,7 @@ func TestWithLevelPanic(t *testing.T) {
 // TestTraceCopiesAttr verifies Trace/Clone copy frozen preset fields to the child.
 func TestTraceCopiesAttr(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf)
-	l.cfg.setCaller(false)
-	l.cfg.setLevel(LINFO)
+	l := New(&buf, WithCaller(false))
 
 	base := l.With().Str("svc", "api").Group() // base has frozen attr svc=api
 	child := base.Trace("sub")                 // Trace must copy attr
@@ -178,7 +176,7 @@ func TestLevelString(t *testing.T) {
 // TestWithHijack verifies WithHijack controls hijacking.
 func TestWithHijack(t *testing.T) {
 	// WithHijack(false): logger constructed without hijacking stdlib
-	l := New(nil, WithHijack(false), WithCaller(false), WithLevel(LINFO))
+	l := New(nil, WithHijack(false), WithCaller(false))
 	if l.cfg.hijack {
 		t.Fatal("WithHijack(false) should set hijack=false")
 	}
@@ -223,7 +221,7 @@ func TestClone(t *testing.T) {
 // TestLoggerClonePresetFields verifies Clone preserves frozen attr.
 func TestLoggerClonePresetFields(t *testing.T) {
 	var buf bytes.Buffer
-	l := New(&buf, WithCaller(false), WithLevel(LINFO))
+	l := New(&buf, WithCaller(false))
 
 	base := l.With().Str("svc", "auth").Group() // base has preset attr
 	child := base.Clone()
