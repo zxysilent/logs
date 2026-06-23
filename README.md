@@ -82,6 +82,14 @@ func main() {
 
 > 旧名 `LDEBUG` / `LINFO` / `LWARN` / `LERROR` / `LNONE` 已废弃，后续主版本移除。
 
+`ParseLevel` 将字符串（大小写不敏感）转为 `Level`：
+```go
+logs.ParseLevel("debug")  // LevelDebug
+logs.ParseLevel("WARN")   // LevelWarn
+logs.ParseLevel("OFF")    // LevelMute
+// 接受: D/DBG/DEBUG/-4, I/INF/INFO/0, W/WRN/WARN/WARNING/4, E/ERR/ERROR/8, OFF/NONE/MUTE
+```
+
 ### 全局函数（操作默认实例）
 
 ```go
@@ -94,6 +102,7 @@ logs.SetFile(path string)                           // 设置文件输出
 logs.SetMaxAge(ma int)                              // 最大保留天数，默认 64
 logs.SetMaxSize(ms int64)                           // 单文件最大容量(MiB)，默认 64
 logs.SetConsole(b bool)                             // 同时输出控制台 (推荐)
+logs.SetTrace(trace string)                          // 设置默认实例命名空间
 logs.Close() error                                  // 关闭
 
 // 输出
@@ -134,6 +143,7 @@ l := logs.New(w,
     logs.WithCaller(true),
     logs.WithSep("/internal", "/"),
     logs.WithSkip(0),
+    logs.WithHijack(true),  // 默认 true，关闭可禁掉 stdlib log 劫持
 )
 
 // 如果自建实例被封装在辅助函数中，需增加 WithSkip(1)

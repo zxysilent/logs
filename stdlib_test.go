@@ -236,3 +236,11 @@ func TestStdLoggerWithTraceCtx(t *testing.T) {
 		t.Fatalf("context msg mismatch: %s", got)
 	}
 }
+
+func TestStdLogger(t *testing.T) {
+	stdlog.Println("111", "222")
+	Println("111", "222")
+
+	stdlog.Println("111", "222", 333, 444)
+	Println("111", "222", 333, 444)
+}

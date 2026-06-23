@@ -51,7 +51,7 @@ func Example_stdlibHijackPrefix() {
 func Example_stdlibPrintCompat() {
 	l := logs.New(os.Stderr)
 	l.Print("a", "b")         // msg=ab
-	l.Println("a", "b")       // msg=a b
+	l.Println("a", "b")       // msg=ab
 	l.Printf("%s:%d", "k", 1) // msg=k:1
 	// Output:
 }

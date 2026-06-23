@@ -82,6 +82,14 @@ Numerically aligned with `log/slog` (higher = more severe).
 
 > `LDEBUG` / `LINFO` / `LWARN` / `LERROR` / `LNONE` are deprecated and will be removed in a future major version.
 
+`ParseLevel` converts a case-insensitive string to a `Level`:
+```go
+logs.ParseLevel("debug")  // LevelDebug
+logs.ParseLevel("WARN")   // LevelWarn
+logs.ParseLevel("OFF")    // LevelMute
+// Accepts: D/DBG/DEBUG/-4, I/INF/INFO/0, W/WRN/WARN/WARNING/4, E/ERR/ERROR/8, OFF/NONE/MUTE
+```
+
 ### Package-level Functions (operate on default instance)
 
 ```go
@@ -94,6 +102,7 @@ logs.SetFile(path string)                           // set file output
 logs.SetMaxAge(ma int)                              // max retention days, default 64
 logs.SetMaxSize(ms int64)                           // max file size (MiB), default 64
 logs.SetConsole(b bool)                             // also print to stderr (recommended)
+logs.SetTrace(trace string)                          // set namespace on default instance
 logs.Close() error                                  // close
 
 // Output
@@ -134,6 +143,7 @@ l := logs.New(w,
     logs.WithCaller(true),
     logs.WithSep("/internal", "/"),
     logs.WithSkip(0),
+    logs.WithHijack(true),  // default true; false to disable stdlib hijack
 )
 
 // If your custom instance is wrapped in a helper, add WithSkip(1) so caller
