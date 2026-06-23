@@ -56,7 +56,8 @@ func main() {
     stdlog.Println("auto hijacked to logfmt")      // hijacked by New()
 
     // === Custom instance (file output) ===
-    w, closeFn := logs.NewFile("./logs/app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+    // Custom instances have correct caller skip; add WithSkip(1) if wrapped in a helper
+    w, closeFn := logs.NewFile("./logs/app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
     defer closeFn()
     applog := logs.New(w, logs.WithLevel(logs.LevelInfo))
     applog.Info("app started")
@@ -121,6 +122,8 @@ logs.Clone(trace ...string) *Logger  // copy (no args) or append trace
 
 ### Logger (custom instance)
 
+**Prefer the package-level default instance.** It requires no initialization and caller skip is already correct.
+
 A `New` logger is configured once via functional options and is **immutable** afterwards
 (no `Set*` methods). For runtime-mutable config, use the package-level default instance.
 
@@ -133,8 +136,16 @@ l := logs.New(w,
     logs.WithSkip(0),
 )
 
-// File output: NewFile returns the Writer + a close handle; optional MaxAge/MaxSize/Cons
-w, closeFn := logs.NewFile("app.log", logs.MaxAge(7), logs.MaxSize(64), logs.Cons(true))
+// If your custom instance is wrapped in a helper, add WithSkip(1) so caller
+// points to the actual call site:
+helper := func(msg string) {
+    l.Info(msg)
+}
+_ = logs.New(w, logs.WithCaller(true), logs.WithSkip(1))
+_ = helper // caller(file:line) points to the caller of helper("msg")
+
+// File output: NewFile returns the Writer + a close handle; optional WithMaxAge/WithMaxSize/WithConsole
+w, closeFn := logs.NewFile("app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
 defer closeFn()
 fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
