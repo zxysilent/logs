@@ -46,13 +46,13 @@ func SetFile(path string) {
 }
 
 // SetMaxAge sets the maximum number of days to retain log files.
-// Must be called after SetFile.
+// Only takes effect when a file writer is active (SetFile).
 func SetMaxAge(ma int) {
 	l.cfg.setMaxAge(ma)
 }
 
 // SetMaxSize sets the maximum size of a single log file in MiB.
-// Must be called after SetFile.
+// Only takes effect when a file writer is active (SetFile).
 func SetMaxSize(ms int64) {
 	l.cfg.setMaxSize(ms)
 }
