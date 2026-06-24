@@ -28,9 +28,9 @@ func Example_defaultSetCaller() {
 
 // Example: SetLevel filters log output.
 func Example_defaultSetLevel() {
-	logs.SetLevel(logs.LDEBUG)
+	logs.SetLevel(logs.LevelDebug)
 	logs.Debug("visible when level is DEBUG")
-	logs.SetLevel(logs.LWARN)
+	logs.SetLevel(logs.LevelWarn)
 	logs.Debug("not visible, level is WARN")
 	logs.Warn("visible, level is WARN")
 	// Output:
@@ -39,7 +39,7 @@ func Example_defaultSetLevel() {
 // Example: Print/Println/Printf compatibility with standard library signatures.
 func Example_defaultPrint() {
 	logs.Print("hello", "world")    // msg=helloworld
-	logs.Println("hello", "world")  // msg=hello world
+	logs.Println("hello", "world")  // msg=helloworld
 	logs.Printf("%s:%d", "key", 42) // msg=key:42
 	// Output:
 }

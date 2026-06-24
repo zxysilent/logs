@@ -1,7 +1,6 @@
 package textenc
 
 import (
-	"bytes"
 	"unicode/utf8"
 )
 
@@ -16,21 +15,39 @@ func PutBytesQuote(dst, s []byte) []byte {
 }
 
 func putBytes(dst, s []byte, quote bool) []byte {
-	quote = quote && bytes.ContainsAny(s, "\t ")
-	if quote {
+	// Single pass: find the first byte that needs escaping while tracking
+	// whether the slice contains a space/tab (which forces quoting).
+	needQuote := false
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if noEscapeTable[b] {
+			if quote && b == ' ' {
+				needQuote = true
+			}
+			continue
+		}
+		if quote && !needQuote {
+			for j := i; j < len(s); j++ {
+				if c := s[j]; c == ' ' || c == '\t' {
+					needQuote = true
+					break
+				}
+			}
+		}
+		if needQuote {
+			dst = append(dst, '"')
+		}
+		dst = appendBytesComplex(dst, s, i)
+		if needQuote {
+			dst = append(dst, '"')
+		}
+		return dst
+	}
+	if needQuote {
 		dst = append(dst, '"')
 	}
-	for i := 0; i < len(s); i++ {
-		if !noEscapeTable[s[i]] {
-			dst = appendBytesComplex(dst, s, i)
-			if quote {
-				dst = append(dst, '"')
-			}
-			return dst
-		}
-	}
 	dst = append(dst, s...)
-	if quote {
+	if needQuote {
 		dst = append(dst, '"')
 	}
 	return dst

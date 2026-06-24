@@ -14,23 +14,23 @@ import (
 
 const (
 	sizeMiB    = 1024 * 1024
-	defMaxage  = 64 //天
-	defMaxsize = 64 //MiB
+	defMaxage  = 64 // days
+	defMaxsize = 64 // MiB
 )
 
 var _ io.WriteCloser = (*Writer)(nil)
 
 type Writer struct {
-	maxage  int       // 最大保留天数
-	maxsize int64     // 单个日志最大容量 默认 64MB
-	size    int64     // 累计大小
-	cons    bool      // 标准输出  默认false
-	fpath   string    // 文件目录 完整路径 fpath=fdir+fname+fsuffix
-	fdir    string    //
-	fname   string    // 文件名
-	fsuffix string    // 文件后缀名 默认 .log
-	created time.Time // 文件创建日期
-	creates []byte    // 文件创建日期 for compare
+	maxage  int       // max retention days
+	maxsize int64     // max size per file, default 64 MiB
+	console bool      // mirror to stderr
+	size    int64     // accumulated size
+	fpath   string    // full path fpath=fdir+fname+fsuffix
+	fdir    string    // directory
+	fname   string    // filename
+	fsuffix string    // suffix, default .log
+	created time.Time // file creation date
+	creates []byte    // file creation date for compare
 	file    *os.File
 	bw      *bufio.Writer
 	tk      *time.Ticker
@@ -39,16 +39,12 @@ type Writer struct {
 	closed  int32 // 0 = open, 1 = closed
 }
 
-func New(path string, cons ...bool) *Writer {
-	consv := false
-	if len(cons) > 0 {
-		consv = cons[0]
-	}
+func New(path string, cons bool) *Writer {
 	w := &Writer{
-		fpath: path, //dir1/dir2/app.log
-		mu:    sync.Mutex{},
-		cons:  consv,
-		done:  make(chan struct{}),
+		fpath:   path, //dir1/dir2/app.log
+		mu:      sync.Mutex{},
+		console: cons,
+		done:    make(chan struct{}),
 	}
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2
 	w.fsuffix = filepath.Ext(w.fpath)                               //.log
@@ -58,11 +54,12 @@ func New(path string, cons ...bool) *Writer {
 	}
 	w.maxsize = sizeMiB * defMaxsize
 	w.maxage = defMaxage
-	os.MkdirAll(filepath.Dir(w.fpath), 0755)
+	os.MkdirAll(w.fdir, 0755)
 	w.tk = time.NewTicker(time.Second * 5)
 	go w.daemon()
 	return w
 }
+
 func (w *Writer) daemon() {
 	for {
 		select {
@@ -74,28 +71,28 @@ func (w *Writer) daemon() {
 	}
 }
 
-// SetMaxAge 最大保留天数
+// SetMaxAge sets the max retention days.
 func (w *Writer) SetMaxAge(ma int) {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.maxage = ma
-	w.mu.Unlock()
 }
 
-// SetMaxSize 单个日志最大容量MiB
+// SetMaxSize sets the max size of a single log file in MiB.
 func (w *Writer) SetMaxSize(ms int64) {
 	if ms < 1 {
 		return
 	}
 	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.maxsize = ms * sizeMiB
-	w.mu.Unlock()
 }
 
-// SetCons 同时输出控制台
-func (w *Writer) SetCons(b bool) {
+// SetConsole sets whether to also output to stderr.
+func (w *Writer) SetConsole(b bool) {
 	w.mu.Lock()
-	w.cons = b
-	w.mu.Unlock()
+	defer w.mu.Unlock()
+	w.console = b
 }
 
 func (w *Writer) equaldate(file []byte, msg []byte) bool {
@@ -109,7 +106,7 @@ func (w *Writer) equaldate(file []byte, msg []byte) bool {
 func (w *Writer) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.cons {
+	if w.console {
 		os.Stderr.Write(p)
 	}
 	if atomic.LoadInt32(&w.closed) != 0 {
@@ -121,14 +118,14 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 			return 0, err
 		}
 	}
-	// 按天切割
+	// rotate by day
 	if !w.equaldate(w.creates, p) { //2023-04-05
-		go w.delete() // 每天检测一次旧文件
+		go w.delete(w.maxage) // daily cleanup
 		if err := w.rotate(); err != nil {
 			return 0, err
 		}
 	}
-	// 按大小切割
+	// rotate by size
 	if w.size+int64(len(p)) >= w.maxsize {
 		if err := w.rotate(); err != nil {
 			return 0, err
@@ -143,14 +140,14 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return
 }
 
-// rotate 切割文件
+// rotate closes the current file and opens a new one.
 func (w *Writer) rotate() error {
 	now := time.Now()
 	if w.file != nil {
 		w.bw.Flush()
 		w.file.Sync()
 		w.file.Close()
-		// 保存
+		// save backup
 		fbak := w.fname + w.time2name(w.created) + w.fsuffix
 		os.Rename(w.fpath, filepath.Join(w.fdir, fbak))
 		w.size = 0
@@ -162,6 +159,7 @@ func (w *Writer) rotate() error {
 		w.created = finfo.ModTime()
 	}
 	w.creates = w.created.AppendFormat(nil, time.RFC3339)
+	os.MkdirAll(w.fdir, 0755)
 	fout, err := os.OpenFile(w.fpath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		return err
@@ -171,15 +169,12 @@ func (w *Writer) rotate() error {
 	return nil
 }
 
-// 删除旧日志
-func (w *Writer) delete() {
-	w.mu.Lock()
-	maxage := w.maxage
-	w.mu.Unlock()
+// delete removes log files older than maxage days.
+func (w *Writer) delete(maxage int) {
 	if maxage <= 0 {
 		return
 	}
-	dir := filepath.Dir(w.fpath)
+	dir := w.fdir
 	fakeNow := time.Now().AddDate(0, 0, -maxage)
 	dirs, err := os.ReadDir(dir)
 	if err != nil {
@@ -191,12 +186,13 @@ func (w *Writer) delete() {
 			continue
 		}
 		t, err := w.name2time(name)
-		// 只删除满足格式的文件
+		// only delete files matching the date pattern
 		if err == nil && t.Before(fakeNow) {
 			os.Remove(filepath.Join(dir, name))
 		}
 	}
 }
+
 func (w *Writer) name2time(name string) (time.Time, error) {
 	name = strings.TrimPrefix(name, filepath.Base(w.fname))
 	name = strings.TrimSuffix(name, w.fsuffix)

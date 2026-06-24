@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 -coverprofile=cover.out ./...
+
+      - name: Coverage Report
+        run: go tool cover -func=cover.out
+
+      - name: Generate HTML Coverage
+        run: go tool cover -html=cover.out -o coverage.html
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.ref_name }}
+          path: |
+            cover.out
+            coverage.html
+
+  release:
+    name: Create Release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "## $TAG" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --oneline $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD >> CHANGELOG.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -20,9 +20,9 @@ func Example_stdlibHijack() {
 
 // Example: stdlib log respects the logs level filter.
 func Example_stdlibHijackLevel() {
-	logs.SetLevel(logs.LWARN)
+	logs.SetLevel(logs.LevelWarn)
 	stdlog.Println("this INFO message is suppressed")
-	logs.SetLevel(logs.LINFO) // restore
+	logs.SetLevel(logs.LevelInfo) // restore
 	// Output:
 }
 
@@ -39,19 +39,11 @@ func Example_stdlibHijackCaller() {
 func Example_stdlibHijackPrefix() {
 	// Set stdlib prefix before creating the logger
 	stdlog.SetPrefix("myprefix")
-	l := logs.New(os.Stderr) // hijackstd reads prefix as namespace
-	l.SetCaller(false)
+	l := logs.New(os.Stderr, logs.WithCaller(false)) // hijackstd reads prefix as namespace
+	_ = l
 	defer stdlog.SetPrefix("") // restore
 
 	stdlog.Println("message with ns")
-	// Output:
-}
-
-// Example: Writer returns an io.Writer that writes logfmt lines.
-func Example_stdlibWriter() {
-	l := logs.New(os.Stderr)
-	w := l.Writer()
-	_, _ = w.Write([]byte("hello from writer"))
 	// Output:
 }
 
@@ -59,7 +51,7 @@ func Example_stdlibWriter() {
 func Example_stdlibPrintCompat() {
 	l := logs.New(os.Stderr)
 	l.Print("a", "b")         // msg=ab
-	l.Println("a", "b")       // msg=a b
+	l.Println("a", "b")       // msg=ab
 	l.Printf("%s:%d", "k", 1) // msg=k:1
 	// Output:
 }

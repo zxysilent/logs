@@ -6,56 +6,59 @@ import (
 	stdlog "log"
 )
 
+// hijackstd hijacks standard library log output and redirects it to this library's logging system.
 func (l *Logger) hijackstd() {
 	stdlog.SetFlags(0)
-	ns := stdlog.Prefix()
+	prefix := stdlog.Prefix()
 	stdlog.SetPrefix("")
-	stdlog.SetOutput(l.stdWriter(ns))
+	stdlog.SetOutput(l.stdWriter(prefix))
 }
 
+// stdWriter is an io.Writer that redirects standard library log output into this library.
 type stdWriter struct {
-	logger *Logger
-	ns     string
+	cfg    *config
+	prefix string
 }
 
+// Write parses a standard library log line and emits it via the shared config.
 func (w *stdWriter) Write(p []byte) (int, error) {
-	if w == nil || w.logger == nil {
+	if w == nil || w.cfg == nil {
 		return len(p), nil
 	}
-	if LINFO < w.logger.level {
+	if LevelInfo < w.cfg.level {
 		return len(p), nil
 	}
 	msg := bytes.TrimRight(p, "\n")
-	nsb := []byte(w.ns)
-	if w.ns != "" && bytes.HasPrefix(msg, nsb) {
+	nsb := []byte(w.prefix)
+	if w.prefix != "" {
 		msg = bytes.TrimPrefix(msg, nsb)
 	}
-	printb(w.ns, LINFO, w.logger.caller, w.logger, nil, msg)
+	w.cfg.printb(w.prefix, LevelInfo, w.cfg.caller, nil, msg)
 	return len(p), nil
 }
 
+// Print logs at info level (stdlib-compatible).
 func (l *Logger) Print(args ...any) {
-	if LINFO >= l.level {
-		print("", LINFO, l.caller, l, nil, args...)
+	if LevelInfo >= l.cfg.level {
+		l.cfg.print(l.trace, LevelInfo, l.cfg.caller, l.preb(), args...)
 	}
 }
 
+// Println logs at info level (stdlib-compatible).
 func (l *Logger) Println(args ...any) {
-	if LINFO >= l.level {
-		print("", LINFO, l.caller, l, nil, args...)
+	if LevelInfo >= l.cfg.level {
+		l.cfg.print(l.trace, LevelInfo, l.cfg.caller, l.preb(), args...)
 	}
 }
 
+// Printf logs a formatted message at info level (stdlib-compatible).
 func (l *Logger) Printf(format string, args ...any) {
-	if LINFO >= l.level {
-		printf("", LINFO, l.caller, l, nil, format, args...)
+	if LevelInfo >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelInfo, l.cfg.caller, l.preb(), format, args...)
 	}
 }
 
-func (l *Logger) stdWriter(ns string) io.Writer {
-	return &stdWriter{logger: l, ns: ns}
-}
-
-func (l *Logger) Writer() io.Writer {
-	return l
+// stdWriter builds an io.Writer that feeds standard library log output into this Logger.
+func (l *Logger) stdWriter(prefix string) io.Writer {
+	return &stdWriter{cfg: l.cfg, prefix: prefix}
 }

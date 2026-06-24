@@ -3,213 +3,138 @@ package logs
 import (
 	"context"
 	"io"
-	"sync"
-
-	"github.com/zxysilent/logs/internal/file"
+	"os"
 )
 
-// 日志等级
-type logLevel int
+// l is the package-level default instance.
+var l = New(os.Stderr)
 
-const (
-	LDEBUG logLevel = iota
-	LINFO
-	LWARN
-	LERROR
-	LNONE
-	logShort = "DBGINFWRNERRNIL" //DBG INF WRN ERR
-)
-const (
-	timeFieldName   = "time"
-	traceFieldName  = "trace"
-	levelFieldName  = "level"
-	mesgFieldName   = "msg"
-	errorFieldName  = "error"
-	callerFieldName = "caller"
-)
+// Set* functions below modify the package-level default instance.
+// They are provided for one-time initialization before logging starts.
+// Runtime modification after logging has begun is NOT recommended —
+// config writes are unsynchronized and may race with concurrent log output.
+// Prefer New() with functional options for immutable, concurrency-safe loggers.
 
-// 字符串等级
-func (lv logLevel) String() string {
-	return logShort[lv*3 : lv*3+3]
+// SetLevel sets the log level of the default instance.
+func SetLevel(lv Level) {
+	l.cfg.setLevel(lv)
 }
 
-type Logger struct {
-	out    io.Writer  // 输出
-	sep    []string   // 路径分隔（取匹配位置最靠后的一个）
-	caller bool       // 调用信息
-	level  logLevel   // 日志等级
-	skip   int        //
-	mu     sync.Mutex // logger🔒
-	fw     *file.Writer
+// SetSep sets the caller path separators.
+func SetSep(sep ...string) {
+	l.cfg.setSep(sep...)
 }
 
-func New(out io.Writer) *Logger {
-	if out == nil {
-		out = io.Discard
-	}
-	n := &Logger{
-		out:    out,
-		caller: false,
-		level:  LINFO,
-		skip:   0,
-		sep:    []string{"/"},
-	}
-	n.hijackstd()
-	return n
+// SetCaller sets whether the default instance outputs caller information.
+func SetCaller(b bool) {
+	l.cfg.setCaller(b)
 }
 
-func (l *Logger) SetFile(path string) {
-	l.fw = file.New(path, true)
-	l.SetOutput(l.fw)
+// SetSkip sets the number of caller frames to skip.
+func SetSkip(skip int) {
+	l.cfg.setSkip(skip)
 }
 
-// SetMaxAge 最大保留天数
-func (l *Logger) SetMaxAge(ma int) {
-	if l.fw == nil {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.fw.SetMaxAge(ma)
+// SetOutput sets the output writer.
+func SetOutput(out io.Writer) {
+	l.cfg.setOutput(out)
 }
 
-// SetMaxSize 单个日志最大容量 MiB
-func (l *Logger) SetMaxSize(ms int64) {
-	if l.fw == nil {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.fw.SetMaxSize(ms)
+// SetFile sets the log file path.
+func SetFile(path string) {
+	l.cfg.setFile(path)
 }
 
-// SetCons 同时输出控制台
-func (l *Logger) SetCons(b bool) {
-	if l.fw == nil {
-		return
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.fw.SetCons(b)
+// SetMaxAge sets the maximum number of days to retain log files.
+// Only takes effect when a file writer is active (SetFile).
+func SetMaxAge(ma int) {
+	l.cfg.setMaxAge(ma)
 }
 
-func (l *Logger) Close() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.fw != nil {
-		return l.fw.Close()
-	}
-	return nil
+// SetMaxSize sets the maximum size of a single log file in MiB.
+// Only takes effect when a file writer is active (SetFile).
+func SetMaxSize(ms int64) {
+	l.cfg.setMaxSize(ms)
 }
 
-// 设置输出等级
-func (l *Logger) SetLevel(lv logLevel) {
-	if lv < LDEBUG || lv > LNONE {
-		panic("illegal log level")
-	}
-	l.mu.Lock()
-	l.level = lv
-	l.mu.Unlock()
+// SetCons sets whether to also output to the console.
+//
+// Deprecated: Use SetConsole instead. This alias is kept for backward
+// compatibility and will be removed in a future major version.
+func SetCons(b bool) {
+	l.cfg.setConsole(b)
 }
 
-// 设置调用信息
-func (l *Logger) SetCaller(b bool) {
-	l.mu.Lock()
-	l.caller = b
-	l.mu.Unlock()
+// SetConsole sets whether to also output to stderr when writing to a file.
+// Only takes effect when a file writer is active (SetFile).
+func SetConsole(b bool) {
+	l.cfg.setConsole(b)
 }
 
-// SetSep 设置调用信息路径分隔符，可传入多个；截断时取匹配位置最靠后的那个。
-// 不传参数时保持原值不变。
-func (l *Logger) SetSep(sep ...string) {
-	if len(sep) == 0 {
-		return
-	}
-	l.mu.Lock()
-	l.sep = sep
-	l.mu.Unlock()
+// SetTrace sets the trace.
+func SetTrace(trace string) {
+	l.trace = trace
 }
 
-func (l *Logger) SetSkip(skip int) {
-	l.mu.Lock()
-	l.skip = skip
-	l.mu.Unlock()
+// The following functions use method-valued variables instead of wrapper
+// functions to keep the caller skip depth identical: logs.Debug and l.Debug
+// produce the same caller:file:line. Wrapping with `func Debug(...) { l.Debug(...) }`
+// would add one extra frame, pushing the caller one level further.
+
+// Debug logs at debug level.
+var Debug = l.Debug
+
+// Debugf logs a formatted message at debug level.
+var Debugf = l.Debugf
+
+// Info logs at info level.
+var Info = l.Info
+
+// Infof logs a formatted message at info level.
+var Infof = l.Infof
+
+// Warn logs at warn level.
+var Warn = l.Warn
+
+// Warnf logs a formatted message at warn level.
+var Warnf = l.Warnf
+
+// Error logs at error level.
+var Error = l.Error
+
+// Errorf logs a formatted message at error level.
+var Errorf = l.Errorf
+
+// Print logs at info level (stdlib-compatible).
+var Print = l.Print
+
+// Printf logs a formatted message at info level (stdlib-compatible).
+var Printf = l.Printf
+
+// Println logs at info level (stdlib-compatible).
+var Println = l.Println
+
+// With is the field logging entry.
+func With(trace ...string) *fielder {
+	return l.With(trace...)
 }
 
-func (l *Logger) SetOutput(out io.Writer) {
-	l.mu.Lock()
-	l.out = out
-	l.mu.Unlock()
+// Ctx is the context logging entry.
+func Ctx(ctx context.Context) *fielder {
+	return l.Ctx(ctx)
 }
 
-func (l *Logger) Write(p []byte) (int, error) {
-	return l.out.Write(p)
+// Trace replaces the namespace of the default instance and returns a child Logger.
+func Trace(trace string) *Logger {
+	return l.Trace(trace)
 }
 
-func (l *Logger) With(trace ...string) *fielder {
-	f := getfl()
-	f.logger = l
-	f.caller = l.caller
-	if len(trace) > 0 {
-		f.trace = trace[0]
-	}
-	f.attr = getb()
-	return f
+// Clone derives a child Logger from the default instance; an optional trace is appended to the namespace.
+func Clone(trace ...string) *Logger {
+	return l.Clone(trace...)
 }
 
-// tracing
-func (l *Logger) Ctx(ctx context.Context) *fielder {
-	f := getfl()
-	f.trace, _ = ctx.Value(traceKey).(string)
-	f.logger = l
-	f.caller = l.caller
-	f.attr = getb()
-	return f
-}
-
-func (l *Logger) Debug(args ...any) {
-	if LDEBUG >= l.level {
-		print("", LDEBUG, l.caller, l, nil, args...)
-	}
-}
-func (l *Logger) Debugf(format string, args ...any) {
-	if LDEBUG >= l.level {
-		printf("", LDEBUG, l.caller, l, nil, format, args...)
-	}
-}
-
-func (l *Logger) Info(args ...any) {
-	if LINFO >= l.level {
-		print("", LINFO, l.caller, l, nil, args...)
-	}
-}
-
-func (l *Logger) Infof(format string, args ...any) {
-	if LINFO >= l.level {
-		printf("", LINFO, l.caller, l, nil, format, args...)
-	}
-}
-
-func (l *Logger) Warn(args ...any) {
-	if LWARN >= l.level {
-		print("", LWARN, l.caller, l, nil, args...)
-	}
-}
-
-func (l *Logger) Warnf(format string, args ...any) {
-	if LWARN >= l.level {
-		printf("", LWARN, l.caller, l, nil, format, args...)
-	}
-}
-
-func (l *Logger) Error(args ...any) {
-	if LERROR >= l.level {
-		print("", LERROR, l.caller, l, nil, args...)
-	}
-}
-
-func (l *Logger) Errorf(format string, args ...any) {
-	if LERROR >= l.level {
-		printf("", LERROR, l.caller, l, nil, format, args...)
-	}
+// Close closes the log file.
+func Close() error {
+	return l.cfg.close()
 }
