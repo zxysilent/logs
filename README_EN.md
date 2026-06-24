@@ -92,6 +92,11 @@ logs.ParseLevel("OFF")    // LevelMute
 
 ### Package-level Functions (operate on default instance)
 
+> **Note**: `Set*` functions should be configured once before logging starts.
+> Runtime modification is **NOT recommended** — config writes are unsynchronized
+> and may race with concurrent log output. Configure during initialization and
+> use immutable `New()` instances for runtime use.
+
 ```go
 logs.SetLevel(lv Level)                             // set log level
 logs.SetCaller(b bool)                              // enable/disable caller line

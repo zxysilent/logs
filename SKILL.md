@@ -28,8 +28,10 @@ LevelMute   Level = 20241020 // Disables all output
 ### Create a Logger
 **Prefer the package-level default instance.** It requires no initialization and the caller skip depth is already correct.
 
+> ⚠️ `Set*` functions should be called during initialization only, before any logging starts. Runtime modification is not recommended — config writes are unsynchronized.
+
 ```go
-// ✅ Recommended: use the default instance
+// ✅ Recommended: use the default instance (configure before logging)
 logs.SetLevel(logs.LevelDebug)
 logs.SetCaller(true)
 logs.Info("hello")

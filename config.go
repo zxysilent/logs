@@ -2,7 +2,6 @@ package logs
 
 import (
 	"io"
-	"sync"
 
 	"github.com/zxysilent/logs/internal/file"
 )
@@ -13,8 +12,10 @@ import (
 // Only the package-level default instance exposes runtime Set* methods —
 // these are provided as a convenience for simple applications that configure
 // before logging, not for dynamic reconfiguration at runtime.
+//
+// Set* methods write config fields without synchronization; they must not
+// be called concurrently with logging output.
 type config struct {
-	mu     sync.Mutex
 	out    io.Writer
 	fw     *file.Writer
 	sep    []string // Path separator (take the one furthest to the right in the matching position)
@@ -75,54 +76,49 @@ func WithConsole(b bool) FileOption { return func(fw *file.Writer) { fw.SetConso
 
 // ----- Runtime modification entry (for package-level default instance only) -----
 
-// setLevel sets the log level under lock.
+// setLevel sets the log level.
 func (c *config) setLevel(lv Level) {
 	if lv < LevelDebug || lv > LevelMute {
 		panic("illegal logs level")
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.level = lv
 }
 
-// setCaller toggles caller output under lock.
+// setCaller toggles caller output.
 func (c *config) setCaller(b bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.caller = b
 }
 
-// setSep sets the caller path separators under lock.
+// setSep sets the caller path separators.
 func (c *config) setSep(sep ...string) {
 	if len(sep) == 0 {
 		return
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.sep = sep
 }
 
-// setSkip sets the number of caller frames to skip under lock.
+// setSkip sets the number of caller frames to skip.
 func (c *config) setSkip(skip int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.skip = skip
 }
 
-// setOutput sets the output writer under lock (nil becomes io.Discard).
+// setOutput sets the output writer (nil becomes io.Discard).
 func (c *config) setOutput(out io.Writer) {
 	if out == nil {
 		out = io.Discard
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if c.fw != nil {
+		c.fw.Close()
+		c.fw = nil
+	}
 	c.out = out
 }
 
-// setFile opens a file writer at path and routes output to it under lock.
+// setFile opens a file writer at path and routes output to it.
 func (c *config) setFile(path string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	if c.fw != nil {
+		c.fw.Close()
+	}
 	c.fw = file.New(path, true)
 	c.out = c.fw
 }
@@ -132,8 +128,6 @@ func (c *config) setMaxAge(ma int) {
 	if c.fw == nil {
 		return
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.fw.SetMaxAge(ma)
 }
 
@@ -142,8 +136,6 @@ func (c *config) setMaxSize(ms int64) {
 	if c.fw == nil {
 		return
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.fw.SetMaxSize(ms)
 }
 
@@ -152,15 +144,11 @@ func (c *config) setConsole(b bool) {
 	if c.fw == nil {
 		return
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.fw.SetConsole(b)
 }
 
 // close closes the underlying file writer if any. file.Writer.Close is idempotent (CAS).
 func (c *config) close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.fw != nil {
 		return c.fw.Close()
 	}

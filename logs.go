@@ -9,6 +9,12 @@ import (
 // l is the package-level default instance.
 var l = New(os.Stderr)
 
+// Set* functions below modify the package-level default instance.
+// They are provided for one-time initialization before logging starts.
+// Runtime modification after logging has begun is NOT recommended —
+// config writes are unsynchronized and may race with concurrent log output.
+// Prefer New() with functional options for immutable, concurrency-safe loggers.
+
 // SetLevel sets the log level of the default instance.
 func SetLevel(lv Level) {
 	l.cfg.setLevel(lv)
@@ -40,11 +46,13 @@ func SetFile(path string) {
 }
 
 // SetMaxAge sets the maximum number of days to retain log files.
+// Must be called after SetFile.
 func SetMaxAge(ma int) {
 	l.cfg.setMaxAge(ma)
 }
 
 // SetMaxSize sets the maximum size of a single log file in MiB.
+// Must be called after SetFile.
 func SetMaxSize(ms int64) {
 	l.cfg.setMaxSize(ms)
 }
@@ -65,8 +73,6 @@ func SetConsole(b bool) {
 
 // SetTrace sets the trace.
 func SetTrace(trace string) {
-	l.cfg.mu.Lock()
-	defer l.cfg.mu.Unlock()
 	l.trace = trace
 }
 
