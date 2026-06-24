@@ -45,6 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Generate Changelog
         id: changelog
@@ -52,7 +54,8 @@ jobs:
           TAG="${{ github.ref_name }}"
           echo "## $TAG" > CHANGELOG.md
           echo "" >> CHANGELOG.md
-          git log --oneline $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~10)..HEAD >> CHANGELOG.md
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null) || PREV=$(git rev-list --max-parents=0 HEAD)
+          git log --oneline "$PREV"..HEAD >> CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
