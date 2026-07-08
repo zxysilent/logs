@@ -37,7 +37,7 @@ func Example_groupFields() {
 // Example: Trace replaces the namespace; Clone(trace) appends to it.
 func Example_traceVsClone() {
 	api := logs.Trace("api")
-	api.Trace("svc").Info("trace=svc")  // Trace replaces: api -> svc
+	api.Trace("svc").Info("trace=svc")     // Trace replaces: api -> svc
 	api.Clone("pay").Info("trace=api.pay") // Clone appends: api -> api.pay
 	api.Clone().Info("trace=api")          // Clone() pure copy
 	// Output:
