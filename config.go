@@ -119,7 +119,7 @@ func (c *config) setFile(path string) {
 	if c.fw != nil {
 		c.fw.Close()
 	}
-	c.fw = file.New(path, true)
+	c.fw = file.New(path)
 	c.out = c.fw
 }
 

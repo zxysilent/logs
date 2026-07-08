@@ -111,7 +111,7 @@ func New(out io.Writer, opts ...Option) *Logger {
 
 // NewFile opens a log file writer, returning the Writer and its close handle.
 func NewFile(path string, opts ...FileOption) (io.Writer, func() error) {
-	fw := file.New(path, true)
+	fw := file.New(path)
 	for _, opt := range opts {
 		opt(fw)
 	}

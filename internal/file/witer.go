@@ -39,11 +39,11 @@ type Writer struct {
 	closed  int32 // 0 = open, 1 = closed
 }
 
-func New(path string, cons bool) *Writer {
+func New(path string) *Writer {
 	w := &Writer{
 		fpath:   path, //dir1/dir2/app.log
 		mu:      sync.Mutex{},
-		console: cons,
+		console: true,
 		done:    make(chan struct{}),
 	}
 	w.fdir = filepath.Dir(w.fpath)                                  //dir1/dir2

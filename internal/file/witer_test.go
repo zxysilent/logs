@@ -9,7 +9,8 @@ import (
 )
 
 func TestName2time(t *testing.T) {
-	f := New("../../logs/app.log", false)
+	f := New("../../logs/app.log")
+	f.console = false
 	t.Logf("%+v", f)
 	f.delete(f.maxage)
 }
@@ -26,7 +27,8 @@ func TestReadDir(t *testing.T) {
 func TestWriterLifecycle(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
+	w := New(path)
+	w.SetConsole(false)
 	defer w.Close()
 
 	w.SetConsole(false)
@@ -101,7 +103,8 @@ func TestWriterLifecycle(t *testing.T) {
 func TestWriteSizeRotate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
+	w := New(path)
+	w.SetConsole(false)
 	defer w.Close()
 
 	// 1 MiB cap; write enough to exceed it and force a size-based rotate.
@@ -134,7 +137,8 @@ func TestWriteSizeRotate(t *testing.T) {
 func TestWriteCrossDayRotate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
+	w := New(path)
+	w.SetConsole(false)
 	defer w.Close()
 
 	// First write establishes the current file and its creation date.
@@ -167,8 +171,8 @@ func TestWriteCrossDayRotate(t *testing.T) {
 func TestWriteAfterClose(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
-
+	w := New(path)
+	w.SetConsole(false)
 	if _, err := w.Write([]byte("before close\n")); err != nil {
 		t.Fatalf("write before close failed: %v", err)
 	}
@@ -184,8 +188,8 @@ func TestWriteAfterClose(t *testing.T) {
 func TestCloseIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
-
+	w := New(path)
+	w.SetConsole(false)
 	if _, err := w.Write([]byte("data\n")); err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
@@ -201,7 +205,8 @@ func TestCloseIdempotent(t *testing.T) {
 func TestRotateFallbackOnRenameFailure(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, false)
+	w := New(path)
+	w.SetConsole(false)
 	defer w.Close()
 
 	// Write something to create the file.
@@ -224,7 +229,7 @@ func TestRotateFallbackOnRenameFailure(t *testing.T) {
 func TestWriteCons(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
-	w := New(path, true)
+	w := New(path)
 	defer w.Close()
 
 	if !w.console {
