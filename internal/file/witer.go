@@ -3,6 +3,7 @@ package file
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -95,52 +96,45 @@ func (w *Writer) SetConsole(b bool) {
 	w.console = b
 }
 
-func (w *Writer) equaldate(file []byte, msg []byte) bool {
-	// Only supports zxysilent/logs
-	if len(file) < 10 || len(msg) < 15 {
-		return true
-	}
-	return bytes.Equal(file[:10], msg[5:15])
-}
-
 func (w *Writer) Write(p []byte) (n int, err error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+	// Write to stderr before acquiring the file lock.
 	if w.console {
 		os.Stderr.Write(p)
 	}
+	// Fast path: if already closed, skip locking entirely.
 	if atomic.LoadInt32(&w.closed) != 0 {
 		return 0, os.ErrClosed
 	}
+	w.mu.Lock()
 	if w.file == nil {
 		if err := w.rotate(); err != nil {
+			w.mu.Unlock()
 			os.Stderr.Write(p)
 			return 0, err
 		}
 	}
-	// rotate by day
-	if !w.equaldate(w.creates, p) { //2023-04-05
+	// rotate by day — inline date comparison (hot path: date changes once/day)
+	if len(w.creates) >= 10 && len(p) >= 15 && !bytes.Equal(w.creates[:10], p[5:15]) {
 		go w.delete(w.maxage) // daily cleanup
 		if err := w.rotate(); err != nil {
+			w.mu.Unlock()
 			return 0, err
 		}
 	}
 	// rotate by size
 	if w.size+int64(len(p)) >= w.maxsize {
 		if err := w.rotate(); err != nil {
+			w.mu.Unlock()
 			return 0, err
 		}
 	}
-	// n, err = w.file.Write(p)
 	n, err = w.bw.Write(p)
 	w.size += int64(n)
-	if err != nil {
-		return n, err
-	}
+	w.mu.Unlock()
 	return
 }
 
-// rotate closes the current file and opens a new one.
+// rotate closes the current file, saves a backup, and opens a new one.
 func (w *Writer) rotate() error {
 	now := time.Now()
 	if w.file != nil {
@@ -151,12 +145,13 @@ func (w *Writer) rotate() error {
 		fbak := w.fname + w.time2name(w.created) + w.fsuffix
 		os.Rename(w.fpath, filepath.Join(w.fdir, fbak))
 		w.size = 0
-	}
-	finfo, err := os.Stat(w.fpath)
-	w.created = now
-	if err == nil {
+		w.created = now
+	} else if finfo, err := os.Stat(w.fpath); err == nil {
+		// First rotation: inherit size and modtime from existing file.
 		w.size = finfo.Size()
 		w.created = finfo.ModTime()
+	} else {
+		w.created = now
 	}
 	w.creates = w.created.AppendFormat(nil, time.RFC3339)
 	os.MkdirAll(w.fdir, 0755)
@@ -165,7 +160,7 @@ func (w *Writer) rotate() error {
 		return err
 	}
 	w.file = fout
-	w.bw = bufio.NewWriter(w.file)
+	w.bw = bufio.NewWriterSize(w.file, 32*1024)
 	return nil
 }
 
@@ -194,9 +189,12 @@ func (w *Writer) delete(maxage int) {
 }
 
 func (w *Writer) name2time(name string) (time.Time, error) {
-	name = strings.TrimPrefix(name, filepath.Base(w.fname))
-	name = strings.TrimSuffix(name, w.fsuffix)
-	return time.Parse(".2006-01-02-150405", name)
+	// Backup filename: <fname>.<date><fsuffix>, e.g. app.2024-01-02-030405.log
+	// Zero-allocation: slicing shares the backing array.
+	if !strings.HasPrefix(name, w.fname) || !strings.HasSuffix(name, w.fsuffix) {
+		return time.Time{}, errors.New("bad format")
+	}
+	return time.Parse(".2006-01-02-150405", name[len(w.fname):len(name)-len(w.fsuffix)])
 }
 
 func (w *Writer) time2name(t time.Time) string {

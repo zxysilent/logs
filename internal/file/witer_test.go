@@ -48,13 +48,6 @@ func TestWriterLifecycle(t *testing.T) {
 		t.Fatalf("SetMaxAge not applied")
 	}
 
-	if !w.equaldate([]byte("2026-05-09"), []byte("time=2026-05-09")) {
-		t.Fatalf("equaldate should match same date")
-	}
-	if w.equaldate([]byte("2026-05-09"), []byte("time=2026-05-10")) {
-		t.Fatalf("equaldate should not match different dates")
-	}
-
 	if got := w.time2name(time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)); got != ".2024-01-02-030405" {
 		t.Fatalf("time2name mismatch: %s", got)
 	}
