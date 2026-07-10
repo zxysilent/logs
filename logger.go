@@ -8,15 +8,6 @@ import (
 	"github.com/zxysilent/logs/internal/file"
 )
 
-const (
-	timeFieldName   = "time"
-	traceFieldName  = "trace"
-	levelFieldName  = "level"
-	mesgFieldName   = "msg"
-	errorFieldName  = "error"
-	callerFieldName = "caller"
-)
-
 // Log level (aligned with log/slog numeric values).
 type Level int
 

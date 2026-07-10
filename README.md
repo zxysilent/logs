@@ -295,26 +295,19 @@ pkg: github.com/zxysilent/logs
 cpu: 12th Gen Intel(R) Core(TM) i5-12500H
 count: average of 3 runs
 
-BenchmarkDisabled         1.2 ns/op,   0 B/op, 0 allocs   // level filter fast path
-BenchmarkParallelSimple    11 ns/op,   0 B/op, 0 allocs   // parallel bare output
-BenchmarkParallelSpan      64 ns/op,   0 B/op, 0 allocs   // parallel Trace + output
-BenchmarkParallel          58 ns/op,   0 B/op, 0 allocs   // parallel With 7 fields
-BenchmarkSimple            76 ns/op,   0 B/op, 0 allocs   // basic Info()
-BenchmarkError            139 ns/op,   0 B/op, 0 allocs   // Error log
-BenchmarkInfof            139 ns/op,  16 B/op, 1 allocs   // formatted output
-BenchmarkWith5Fields      213 ns/op,   0 B/op, 0 allocs   // 5 structured fields
-BenchmarkWith10Fields     310 ns/op,   0 B/op, 0 allocs   // 10 structured fields
-BenchmarkSimpleCaller     491 ns/op,   0 B/op, 0 allocs   // Info + caller
-BenchmarkParallelFile     346 ns/op,   0 B/op, 0 allocs   // parallel file write
+BenchmarkDisabled         1.0 ns/op,   0 B/op, 0 allocs   // level filter fast path
+BenchmarkParallelSimple    12 ns/op,   0 B/op, 0 allocs   // parallel bare output
+BenchmarkParallelSpan      62 ns/op,   0 B/op, 0 allocs   // parallel Trace + output
+BenchmarkParallel          60 ns/op,   0 B/op, 0 allocs   // parallel With 7 fields
+BenchmarkSimple            50 ns/op,   0 B/op, 0 allocs   // basic Info()
+BenchmarkError            106 ns/op,   0 B/op, 0 allocs   // Error log
+BenchmarkInfof            100 ns/op,  16 B/op, 1 allocs   // formatted output
+BenchmarkWith5Fields      187 ns/op,   0 B/op, 0 allocs   // 5 structured fields
+BenchmarkWith10Fields     289 ns/op,   0 B/op, 0 allocs   // 10 structured fields
+BenchmarkSimpleCaller     284 ns/op,   0 B/op, 0 allocs   // Info + caller
+BenchmarkParallelFile     309 ns/op,   0 B/op, 0 allocs   // parallel file write
 ```
 
-### Optimizations
-
-- Built-in keys (`time`/`level`/`trace`/`caller`/`msg`) skip quoting via `PutKeyRaw`
-- Single-argument type dispatch bypasses `fmt.Sprint`
-- `sync.Pool` buffer reuse, zero-allocation fast path
-
----
 
 ## Inspired by
 

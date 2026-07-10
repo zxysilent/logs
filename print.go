@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	callerBaseSkip = 4
-	writerBaseSkip = 7
+	callerSkip = 4 // putCaller → print/printf → (method) → caller
+	writerSkip = 7
 )
 
 // lastSep returns the last index where any separator matches in file, or -1 if none.
@@ -47,125 +47,145 @@ func (c *config) putCaller(buf *buffer, skip int) {
 			}
 		}
 	}
-	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, callerFieldName), file)
+	*buf = append(*buf, " caller="...)
+	*buf = textenc.PutString(*buf, file)
 	*buf = append(*buf, ':')
 	*buf = strconv.AppendInt(*buf, int64(line), 10)
+}
+
+// putLevel writes " level=XXX" — buf is always non-empty at this point.
+func putLevel(dst *buffer, lv Level) {
+	switch lv {
+	case LevelDebug:
+		*dst = append(*dst, " level=DBG"...)
+	case LevelInfo:
+		*dst = append(*dst, " level=INF"...)
+	case LevelWarn:
+		*dst = append(*dst, " level=WRN"...)
+	case LevelError:
+		*dst = append(*dst, " level=ERR"...)
+	default:
+		*dst = append(*dst, " level=OFF"...)
+	}
 }
 
 // print writes a log record.
 func (c *config) print(trace string, lv Level, caller bool, attr *buffer, args ...any) {
 	buf := getb()
-	defer putb(buf)
-	*buf = textenc.PutBegin(*buf)
-	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
-	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
+	*buf = append(*buf, "time="...)
+	*buf = textenc.PutTime(*buf, time.Now())
+	putLevel(buf, lv)
 	if trace != "" {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
+		*buf = append(*buf, " trace="...)
+		*buf = textenc.PutString(*buf, trace)
 	}
 	if caller {
-		c.putCaller(buf, c.skip+callerBaseSkip)
+		c.putCaller(buf, c.skip+callerSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
-		*buf = textenc.PutDelim(*buf)
+		*buf = append(*buf, ' ')
 		*buf = append(*buf, *attr...)
 	}
 	n := len(args)
 	if n == 1 {
-		key := textenc.PutKeyRaw(*buf, mesgFieldName)
+		*buf = append(*buf, " msg="...)
 		switch v := args[0].(type) {
 		case string:
-			*buf = textenc.PutStringQuote(key, v)
+			*buf = textenc.PutStringQuote(*buf, v)
 		case []byte:
-			*buf = textenc.PutBytesQuote(key, v)
+			*buf = textenc.PutBytesQuote(*buf, v)
 		case bool:
-			*buf = textenc.PutBool(key, v)
+			*buf = textenc.PutBool(*buf, v)
 		case int:
-			*buf = textenc.PutInt(key, v)
+			*buf = textenc.PutInt(*buf, v)
 		case int8:
-			*buf = textenc.PutInt8(key, v)
+			*buf = textenc.PutInt8(*buf, v)
 		case int16:
-			*buf = textenc.PutInt16(key, v)
+			*buf = textenc.PutInt16(*buf, v)
 		case int32:
-			*buf = textenc.PutInt32(key, v)
+			*buf = textenc.PutInt32(*buf, v)
 		case int64:
-			*buf = textenc.PutInt64(key, v)
+			*buf = textenc.PutInt64(*buf, v)
 		case uint:
-			*buf = textenc.PutUint(key, v)
+			*buf = textenc.PutUint(*buf, v)
 		case uint8:
-			*buf = textenc.PutUint8(key, v)
+			*buf = textenc.PutUint8(*buf, v)
 		case uint16:
-			*buf = textenc.PutUint16(key, v)
+			*buf = textenc.PutUint16(*buf, v)
 		case uint32:
-			*buf = textenc.PutUint32(key, v)
+			*buf = textenc.PutUint32(*buf, v)
 		case uint64:
-			*buf = textenc.PutUint64(key, v)
+			*buf = textenc.PutUint64(*buf, v)
 		case float32:
-			*buf = textenc.PutFloat32(key, v)
+			*buf = textenc.PutFloat32(*buf, v)
 		case float64:
-			*buf = textenc.PutFloat64(key, v)
+			*buf = textenc.PutFloat64(*buf, v)
 		case fmt.Stringer:
-			*buf = textenc.PutStringQuote(key, v.String())
+			*buf = textenc.PutStringQuote(*buf, v.String())
 		default:
-			*buf = textenc.PutStringQuote(key, fmt.Sprint(v))
+			*buf = textenc.PutStringQuote(*buf, fmt.Sprint(v))
 		}
 	} else if n > 1 {
-		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprint(args...))
+		*buf = append(*buf, " msg="...)
+		*buf = textenc.PutStringQuote(*buf, fmt.Sprint(args...))
 	}
-	*buf = textenc.PutEnd(*buf)
-	*buf = textenc.PutBreak(*buf)
+	*buf = append(*buf, '\n')
 	c.out.Write(*buf)
+	putb(buf)
 }
 
 // printf writes a formatted log record.
 func (c *config) printf(trace string, lv Level, caller bool, attr *buffer, format string, args ...any) {
 	buf := getb()
-	defer putb(buf)
-	*buf = textenc.PutBegin(*buf)
-	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
-	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
+	*buf = append(*buf, "time="...)
+	*buf = textenc.PutTime(*buf, time.Now())
+	putLevel(buf, lv)
 	if trace != "" {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
+		*buf = append(*buf, " trace="...)
+		*buf = textenc.PutString(*buf, trace)
 	}
 	if caller {
-		c.putCaller(buf, c.skip+callerBaseSkip)
+		c.putCaller(buf, c.skip+callerSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
-		*buf = textenc.PutDelim(*buf)
+		*buf = append(*buf, ' ')
 		*buf = append(*buf, *attr...)
 	}
+	*buf = append(*buf, " msg="...)
 	if len(args) >= 1 {
-		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), fmt.Sprintf(format, args...))
+		*buf = textenc.PutStringQuote(*buf, fmt.Sprintf(format, args...))
 	} else {
-		*buf = textenc.PutStringQuote(textenc.PutKeyRaw(*buf, mesgFieldName), format)
+		*buf = textenc.PutStringQuote(*buf, format)
 	}
-	*buf = textenc.PutEnd(*buf)
-	*buf = textenc.PutBreak(*buf)
+	*buf = append(*buf, '\n')
 	c.out.Write(*buf)
+	putb(buf)
 }
 
 // printb writes a log record with a byte slice message.
 func (c *config) printb(trace string, lv Level, caller bool, attr *buffer, msg []byte) {
 	buf := getb()
-	defer putb(buf)
-	*buf = textenc.PutBegin(*buf)
-	*buf = textenc.PutTime(textenc.PutKeyRaw(*buf, timeFieldName), time.Now())
-	*buf = textenc.PutString(textenc.PutKeyRaw(*buf, levelFieldName), lv.String())
+	*buf = append(*buf, "time="...)
+	*buf = textenc.PutTime(*buf, time.Now())
+	putLevel(buf, lv)
 	if trace != "" {
-		*buf = textenc.PutString(textenc.PutKeyRaw(*buf, traceFieldName), trace)
+		*buf = append(*buf, " trace="...)
+		*buf = textenc.PutString(*buf, trace)
 	}
 	if caller {
-		c.putCaller(buf, c.skip+writerBaseSkip)
+		c.putCaller(buf, c.skip+writerSkip)
 	}
 	if attr != nil && len(*attr) >= 1 {
-		*buf = textenc.PutDelim(*buf)
+		*buf = append(*buf, ' ')
 		*buf = append(*buf, *attr...)
 	}
 	if len(msg) >= 1 {
-		*buf = textenc.PutBytesQuote(textenc.PutKeyRaw(*buf, mesgFieldName), msg)
+		*buf = append(*buf, " msg="...)
+		*buf = textenc.PutBytesQuote(*buf, msg)
 	}
-	*buf = textenc.PutEnd(*buf)
-	*buf = textenc.PutBreak(*buf)
+	*buf = append(*buf, '\n')
 	c.out.Write(*buf)
+	putb(buf)
 }
 
 const maxBufferSize = 512

@@ -45,9 +45,9 @@ func (s *fielder) Err(err error) *fielder {
 		return s
 	}
 	if err == nil {
-		*s.attr = textenc.PutNil(textenc.PutKey(*s.attr, errorFieldName))
+		*s.attr = textenc.PutNil(textenc.PutKey(*s.attr, "error"))
 	} else {
-		*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, errorFieldName), err.Error())
+		*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, "error"), err.Error())
 	}
 	return s
 }
@@ -61,7 +61,7 @@ func (s *fielder) IfErr(err error) *fielder {
 	if s.attr == nil {
 		return s
 	}
-	*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, errorFieldName), err.Error())
+	*s.attr = textenc.PutStringQuote(textenc.PutKey(*s.attr, "error"), err.Error())
 	return s
 }
 

@@ -294,26 +294,19 @@ pkg: github.com/zxysilent/logs
 cpu: 12th Gen Intel(R) Core(TM) i5-12500H
 count: 3 轮平均值
 
-BenchmarkDisabled         1.2 ns/op,   0 B/op, 0 allocs   // 过滤快速路径
-BenchmarkParallelSimple    11 ns/op,   0 B/op, 0 allocs   // 并行裸输出
-BenchmarkParallelSpan      64 ns/op,   0 B/op, 0 allocs   // 并行 Trace+输出
-BenchmarkParallel          58 ns/op,   0 B/op, 0 allocs   // 并行 With 7 字段
-BenchmarkSimple            76 ns/op,   0 B/op, 0 allocs   // 基础 Info()
-BenchmarkError            139 ns/op,   0 B/op, 0 allocs   // Error 日志
-BenchmarkInfof            139 ns/op,  16 B/op, 1 allocs   // 格式化输出
-BenchmarkWith5Fields      213 ns/op,   0 B/op, 0 allocs   // 5 个结构化字段
-BenchmarkWith10Fields     310 ns/op,   0 B/op, 0 allocs   // 10 个结构化字段
-BenchmarkSimpleCaller     491 ns/op,   0 B/op, 0 allocs   // Info + caller
-BenchmarkParallelFile     346 ns/op,   0 B/op, 0 allocs   // 并行写入文件
+BenchmarkDisabled         1.0 ns/op,   0 B/op, 0 allocs   // 过滤快速路径
+BenchmarkParallelSimple    12 ns/op,   0 B/op, 0 allocs   // 并行裸输出
+BenchmarkParallelSpan      62 ns/op,   0 B/op, 0 allocs   // 并行 Trace+输出
+BenchmarkParallel          60 ns/op,   0 B/op, 0 allocs   // 并行 With 7 字段
+BenchmarkSimple            50 ns/op,   0 B/op, 0 allocs   // 基础 Info()
+BenchmarkError            106 ns/op,   0 B/op, 0 allocs   // Error 日志
+BenchmarkInfof            100 ns/op,  16 B/op, 1 allocs   // 格式化输出
+BenchmarkWith5Fields      187 ns/op,   0 B/op, 0 allocs   // 5 个结构化字段
+BenchmarkWith10Fields     289 ns/op,   0 B/op, 0 allocs   // 10 个结构化字段
+BenchmarkSimpleCaller     284 ns/op,   0 B/op, 0 allocs   // Info + caller
+BenchmarkParallelFile     309 ns/op,   0 B/op, 0 allocs   // 并行写入文件
 ```
 
-### 优化要点
-
-- 内置 key（`time`/`level`/`trace`/`caller`/`msg`）使用 `PutKeyRaw`，跳过 quoting 检查
-- 单参数类型分派（string/int*/uint*/float*/bool/[]byte/`fmt.Stringer`），绕过 `fmt.Sprint` 的 interface dispatch
-- buffer / fielder 均由 `sync.Pool` 复用，关键路径 0 分配
-
----
 
 ## 灵感来源
 
