@@ -30,16 +30,6 @@ func PutNil(dst []byte) []byte {
 	return append(dst, "nil"...)
 }
 
-// PutBegin marks the start of a record (no-op in logfmt).
-func PutBegin(dst []byte) []byte {
-	return dst
-}
-
-// PutEnd marks the end of a record (no-op in logfmt).
-func PutEnd(dst []byte) []byte {
-	return dst
-}
-
 // PutDelim appends a separator between elements.
 func PutDelim(dst []byte) []byte {
 	if len(dst) > 0 {

@@ -79,12 +79,6 @@ func TestEncoderHelpers(t *testing.T) {
 	if got := string(PutNil(nil)); got != "nil" {
 		t.Fatalf("PutNil mismatch: %q", got)
 	}
-	if got := string(PutBegin([]byte("a"))); got != "a" {
-		t.Fatalf("PutBegin mismatch: %q", got)
-	}
-	if got := string(PutEnd([]byte("a"))); got != "a" {
-		t.Fatalf("PutEnd mismatch: %q", got)
-	}
 	if got := string(PutDelim(nil)); got != "" {
 		t.Fatalf("PutDelim empty mismatch: %q", got)
 	}
