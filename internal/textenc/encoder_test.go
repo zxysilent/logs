@@ -1,6 +1,7 @@
 package textenc
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -253,35 +254,34 @@ func TestPutKeyNonEmptyDst(t *testing.T) {
 	}
 }
 
-// TestAppendIntGeneral covers the non-specialized appendInt paths:
-// negative numbers, widths other than 2/4, zero, and buffer growth.
-func TestAppendIntGeneral(t *testing.T) {
-	tests := []struct {
-		x     int
-		width int
-		want  string
-	}{
-		{0, 0, "0"},
-		{0, 3, "000"},
-		{5, 3, "005"},
-		{-7, 2, "-07"},
-		{-123, 0, "-123"},
-		{12345, 4, "12345"}, // width 4 but value >= 1e4 -> general path
-		{42, 6, "000042"},
-		{100, 2, "100"}, // width 2 but value >= 1e2 -> general path
-	}
-	for _, tt := range tests {
-		if got := string(appendInt(nil, tt.x, tt.width)); got != tt.want {
-			t.Errorf("appendInt(%d, %d) = %q, want %q", tt.x, tt.width, got, tt.want)
+// TestPut234 covers the fixed-width digit helpers used by PutTime.
+func TestPut234(t *testing.T) {
+	// put2 bounds
+	for v := 0; v < 100; v++ {
+		var buf [2]byte
+		put2(buf[:], v)
+		want := fmt.Sprintf("%02d", v)
+		if string(buf[:]) != want {
+			t.Errorf("put2(%d) = %q, want %q", v, buf, want)
 		}
 	}
-	// Append onto an existing slice with spare capacity to exercise the
-	// len(b)+n <= cap(b) growth branch.
-	buf := make([]byte, 0, 16)
-	buf = append(buf, "n="...)
-	buf = appendInt(buf, 98765, 0)
-	if string(buf) != "n=98765" {
-		t.Fatalf("appendInt onto buffer: %q", buf)
+	// put3 bounds
+	for v := 0; v < 1000; v++ {
+		var buf [3]byte
+		put3(buf[:], v)
+		want := fmt.Sprintf("%03d", v)
+		if string(buf[:]) != want {
+			t.Errorf("put3(%d) = %q, want %q", v, buf, want)
+		}
+	}
+	// put4 bounds
+	for v := 0; v < 10000; v++ {
+		var buf [4]byte
+		put4(buf[:], v)
+		want := fmt.Sprintf("%04d", v)
+		if string(buf[:]) != want {
+			t.Errorf("put4(%d) = %q, want %q", v, buf, want)
+		}
 	}
 }
 

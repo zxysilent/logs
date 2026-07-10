@@ -4,87 +4,68 @@ import (
 	"time"
 )
 
-// PutTime formats the input time with the given format
+// PutTime formats the input time as YYYY-MM-DDTHH:MM:SS.MMM
 // and appends the encoded string to the input byte slice.
 func PutTime(dst []byte, t time.Time) []byte {
-	// Format date.
 	year, month, day := t.Date()
-	dst = appendInt(dst, year, 4)
-	dst = append(dst, '-')
-	dst = appendInt(dst, int(month), 2)
-	dst = append(dst, '-')
-	dst = appendInt(dst, day, 2)
-
-	dst = append(dst, 'T')
-
-	// Format time.
 	hour, min, sec := t.Clock()
-	dst = appendInt(dst, hour, 2)
-	dst = append(dst, ':')
-	dst = appendInt(dst, min, 2)
-	dst = append(dst, ':')
-	dst = appendInt(dst, sec, 2)
-
-	dst = append(dst, '.')
 	ms := t.Nanosecond() / 1e6
-	dst = appendInt(dst, ms, 3)
+
+	// Ensure capacity for the fixed 23-byte layout, then write directly.
+	n := len(dst)
+	if n+23 <= cap(dst) {
+		dst = dst[:n+23]
+	} else {
+		dst = append(dst, make([]byte, 23)...)
+	}
+
+	// YYYY-MM-DDTHH:MM:SS.MMM
+	// 01234567890123456789012
+
+	// Year: 4 digits (arithmetic).
+	put4(dst[n:], year)
+	dst[n+4] = '-'
+	// Month: 2 digits
+	put2(dst[n+5:], int(month))
+	dst[n+7] = '-'
+	// Day: 2 digits
+	put2(dst[n+8:], day)
+	dst[n+10] = 'T'
+	// Hour: 2 digits
+	put2(dst[n+11:], hour)
+	dst[n+13] = ':'
+	// Minute: 2 digits
+	put2(dst[n+14:], min)
+	dst[n+16] = ':'
+	// Second: 2 digits
+	put2(dst[n+17:], sec)
+	dst[n+19] = '.'
+	// Millisecond: 3 digits
+	put3(dst[n+20:], ms)
+
 	return dst
+}
+
+func put2(dst []byte, v int) {
+	dst[0] = '0' + byte(v/10)
+	dst[1] = '0' + byte(v%10)
+}
+
+func put3(dst []byte, v int) {
+	dst[0] = '0' + byte(v/100)
+	dst[1] = '0' + byte((v/10)%10)
+	dst[2] = '0' + byte(v%10)
+}
+
+func put4(dst []byte, v int) {
+	dst[0] = '0' + byte(v/1000)
+	dst[1] = '0' + byte((v/100)%10)
+	dst[2] = '0' + byte((v/10)%10)
+	dst[3] = '0' + byte(v%10)
 }
 
 // PutDuration formats the input duration with the given unit & format
 // and appends the encoded string to the input byte slice.
 func PutDuration(dst []byte, d time.Duration) []byte {
 	return PutString(dst, d.String())
-}
-
-// appendInt appends the decimal form of x to b and returns the result.
-// If the decimal form (excluding sign) is shorter than width, the result is padded with leading 0's.
-// Duplicates functionality in strconv, but avoids dependency.
-func appendInt(b []byte, x int, width int) []byte {
-	u := uint(x)
-	if x < 0 {
-		b = append(b, '-')
-		u = uint(-x)
-	}
-
-	// 2-digit and 4-digit fields are the most common in time formats.
-	utod := func(u uint) byte { return '0' + byte(u) }
-	switch {
-	case width == 2 && u < 1e2:
-		return append(b, utod(u/1e1), utod(u%1e1))
-	case width == 4 && u < 1e4:
-		return append(b, utod(u/1e3), utod(u/1e2%1e1), utod(u/1e1%1e1), utod(u%1e1))
-	}
-
-	// Compute the number of decimal digits.
-	var n int
-	if u == 0 {
-		n = 1
-	}
-	for u2 := u; u2 > 0; u2 /= 10 {
-		n++
-	}
-
-	// Add 0-padding.
-	for pad := width - n; pad > 0; pad-- {
-		b = append(b, '0')
-	}
-
-	// Ensure capacity.
-	if len(b)+n <= cap(b) {
-		b = b[:len(b)+n]
-	} else {
-		b = append(b, make([]byte, n)...)
-	}
-
-	// Assemble decimal in reverse order.
-	i := len(b) - 1
-	for u >= 10 && i > 0 {
-		q := u / 10
-		b[i] = utod(u - q*10)
-		u = q
-		i--
-	}
-	b[i] = utod(u)
-	return b
 }
