@@ -1508,7 +1508,7 @@ func FuzzInfof(f *testing.F) {
 	f.Add("%d", "42")
 	f.Fuzz(func(t *testing.T, format, arg string) {
 		l.Infof(format, arg)
-		l.Infof(format)
+		l.Info(format)
 		l.Infof("%s %s", arg, arg)
 	})
 }

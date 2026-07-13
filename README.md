@@ -14,6 +14,9 @@
 - **File output**: daily rotation, configurable max age/size, optional console mirroring
 - **High performance**: zero-allocation fast path, `sync.Pool` buffer reuse
 
+> **Version note**: v0.12.x requires **Go 1.24+**.  
+> Go 1.20 users should use **v0.11.x** (`go get github.com/zxysilent/logs@v0.11`).
+
 ---
 
 ## Quick Start

@@ -1,6 +1,6 @@
 module github.com/zxysilent/logs
 
-go 1.20
+go 1.24
 
 retract (
 	v0.8.3
