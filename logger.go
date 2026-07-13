@@ -95,7 +95,7 @@ func New(out io.Writer, opts ...Option) *Logger {
 	}
 	l := &Logger{cfg: cfg}
 	if l.cfg.hijack {
-		l.hijackstd()
+		l.dohijack()
 	}
 	return l
 }
