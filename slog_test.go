@@ -418,3 +418,132 @@ func TestSlogHandlerResolvesValuesAndQuotesKeys(t *testing.T) {
 		t.Fatalf("log valuer or quoted key missing: %s", got)
 	}
 }
+
+func FuzzSlogHandler(f *testing.F) {
+	f.Add("request", "method", "GET", int64(200))
+	f.Add("line\nbreak", "key with space", "quoted\"value", int64(-1))
+	f.Add("", "", "", int64(0))
+
+	f.Fuzz(func(t *testing.T, msg, key, value string, number int64) {
+		var buf bytes.Buffer
+		logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+
+		logger.Info(msg, slog.String(key, value), slog.Int64("number", number))
+		logger.With(slog.String(key, value)).Info(msg)
+		logger.WithGroup("group").Info(msg, slog.String(key, value))
+
+		got := buf.String()
+		if lines := strings.Count(got, "\n"); lines != 3 {
+			t.Fatalf("got %d records, want 3: %q", lines, got)
+		}
+		if levels := strings.Count(got, "level=INF"); levels != 3 {
+			t.Fatalf("got %d INFO levels, want 3: %q", levels, got)
+		}
+		if messages := strings.Count(got, " msg="); messages != 3 {
+			t.Fatalf("got %d message fields, want 3: %q", messages, got)
+		}
+	})
+}
+
+type fuzzSlogValuer struct {
+	key    string
+	value  string
+	number int64
+}
+
+func (v fuzzSlogValuer) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String(v.key, v.value),
+		slog.Int64("number", v.number),
+	)
+}
+
+func FuzzSlogLogValuer(f *testing.F) {
+	f.Add("resolved", "name", "alice", int64(42))
+	f.Add("line\nbreak", "key with space", "quoted\"value", int64(-1))
+	f.Add("", "", "", int64(0))
+
+	f.Fuzz(func(t *testing.T, msg, key, value string, number int64) {
+		var buf bytes.Buffer
+		logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+
+		logger.Info(msg, slog.Any("value", fuzzSlogValuer{
+			key:    key,
+			value:  value,
+			number: number,
+		}))
+
+		got := buf.String()
+		if lines := strings.Count(got, "\n"); lines != 1 {
+			t.Fatalf("got %d records, want 1: %q", lines, got)
+		}
+		if !strings.Contains(got, "level=INF") || !strings.Contains(got, " msg=") {
+			t.Fatalf("incomplete log record: %q", got)
+		}
+		if !strings.Contains(got, "value.number=") {
+			t.Fatalf("LogValuer group was not resolved: %q", got)
+		}
+	})
+}
+
+func BenchmarkSlogBasic(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("hello world")
+	}
+}
+
+func BenchmarkSlogAttrs(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("request", "method", "GET", "status", 200, "cached", true)
+	}
+}
+
+func BenchmarkSlogWithAttrs(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler()).With(
+		"service", "api",
+		"version", 2,
+		"production", true,
+	)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("request")
+	}
+}
+
+func BenchmarkSlogGroup(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("request", slog.Group("http",
+			slog.String("method", "GET"),
+			slog.Int("status", 200),
+			slog.Bool("cached", true),
+		))
+	}
+}
+
+func BenchmarkSlogCaller(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithCaller(true), WithHijack(false)).NewSlogHandler())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("with caller")
+	}
+}
+
+func BenchmarkSlogFiltered(b *testing.B) {
+	logger := slog.New(New(io.Discard, WithLevel(LevelWarn), WithHijack(false)).NewSlogHandler())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		logger.Info("filtered")
+	}
+}

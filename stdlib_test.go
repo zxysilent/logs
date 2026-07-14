@@ -177,6 +177,40 @@ func TestStdWriterLevelFilter(t *testing.T) {
 	}
 }
 
+func FuzzStdWriter(f *testing.F) {
+	f.Add("ns", []byte("nspayload\n"))
+	f.Add("prefix with space", []byte("arbitrary\x00bytes\n\n"))
+	f.Add("", []byte{})
+
+	f.Fuzz(func(t *testing.T, prefix string, payload []byte) {
+		var buf bytes.Buffer
+		logger := New(&buf, WithCaller(false), WithHijack(false))
+		writer := logger.stdWriter(prefix)
+
+		n, err := writer.Write(payload)
+		if err != nil {
+			t.Fatalf("Write returned error: %v", err)
+		}
+		if n != len(payload) {
+			t.Fatalf("Write returned %d bytes, want %d", n, len(payload))
+		}
+		got := buf.String()
+		if lines := strings.Count(got, "\n"); lines != 1 {
+			t.Fatalf("got %d records, want 1: %q", lines, got)
+		}
+		if !strings.Contains(got, "time=") || !strings.Contains(got, "level=INF") {
+			t.Fatalf("incomplete log record: %q", got)
+		}
+		msg := bytes.TrimRight(payload, "\n")
+		if prefix != "" {
+			msg = bytes.TrimPrefix(msg, []byte(prefix))
+		}
+		if len(msg) > 0 && !strings.Contains(got, " msg=") {
+			t.Fatalf("non-empty payload missing message field: %q", got)
+		}
+	})
+}
+
 func TestTraceCallerLine(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf, WithCaller(true), WithSkip(0)).Trace("myapp")

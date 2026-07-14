@@ -1224,6 +1224,31 @@ func TestNewLoggerConcurrentOutput(t *testing.T) {
 	}
 }
 
+func FuzzLoggerInfo(f *testing.F) {
+	f.Add("hello", "key", "value", int64(42))
+	f.Add("line\nbreak", "key with space", "quoted\"value", int64(-1))
+	f.Add("", "", "", int64(0))
+
+	f.Fuzz(func(t *testing.T, msg, key, value string, number int64) {
+		var buf bytes.Buffer
+		logger := New(&buf, WithCaller(false), WithHijack(false))
+
+		logger.Info(msg)
+		logger.With().Str(key, value).Int64("number", number).Info(msg)
+
+		got := buf.String()
+		if lines := strings.Count(got, "\n"); lines != 2 {
+			t.Fatalf("got %d records, want 2: %q", lines, got)
+		}
+		if levels := strings.Count(got, "level=INF"); levels != 2 {
+			t.Fatalf("got %d INFO levels, want 2: %q", levels, got)
+		}
+		if messages := strings.Count(got, " msg="); messages != 2 {
+			t.Fatalf("got %d message fields, want 2: %q", messages, got)
+		}
+	})
+}
+
 // ---------------------------------------------------------------------------------------------------
 // Benchmarks
 // ---------------------------------------------------------------------------------------------------
