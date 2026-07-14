@@ -1,3 +1,5 @@
 logs/*
 cover.out
 cover.html
+cpu.prof
+docs/*
