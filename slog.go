@@ -2,8 +2,9 @@ package logs
 
 import (
 	"context"
-	"io"
 	"log/slog"
+	"runtime"
+	"strconv"
 
 	"github.com/zxysilent/logs/internal/textenc"
 )
@@ -27,88 +28,79 @@ func slogLevelString(lv slog.Level) string {
 //
 // Usage:
 //
-//	h := logs.NewSlogHandler(os.Stderr, &logs.SlogHandlerOptions{Level: slog.LevelInfo})
-//	logger := slog.New(h)
+//	logger := slog.New(logs.NewSlogHandler())
 //	logger.Info("hello", "key", "value")
 type SlogHandler struct {
-	w     io.Writer
-	level slog.Leveler
-	group string      // current group prefix (dot-separated), from WithGroup
-	attrs []slog.Attr // unencoded attrs from WithAttrs
-	buf   []byte      // reusable encode buffer
+	cfg   *config
+	group string
+	attrs []byte
 }
 
-// SlogHandlerOptions configures a SlogHandler.
-type SlogHandlerOptions struct {
-	// Level is the minimum level to log. Defaults to slog.LevelInfo.
-	Level slog.Leveler
+// NewSlogHandler returns a handler backed by the package-level logs config.
+func NewSlogHandler() slog.Handler {
+	return l.NewSlogHandler()
 }
 
-// NewSlogHandler creates a SlogHandler that writes logfmt output to w.
-func NewSlogHandler(w io.Writer, opts *SlogHandlerOptions) *SlogHandler {
-	h := &SlogHandler{w: w, level: slog.LevelInfo}
-	if opts != nil && opts.Level != nil {
-		h.level = opts.Level
-	}
-	return h
-}
-
-// SlogHandler returns a slog.Handler that writes through this Logger's config.
-func (l *Logger) SlogHandler() slog.Handler {
-	switch l.cfg.level {
-	case LevelDebug, LevelInfo, LevelWarn, LevelError:
-		return &SlogHandler{w: l.cfg.out, level: logSlogLeveler(l.cfg.level)}
-	default:
-		return &internalSlogHandler{cfg: l.cfg, level: l.cfg.level}
-	}
-}
-
-func logSlogLeveler(lv Level) slog.Level {
-	switch lv {
-	case LevelDebug:
-		return slog.LevelDebug
-	case LevelInfo:
-		return slog.LevelInfo
-	case LevelWarn:
-		return slog.LevelWarn
-	default:
-		return slog.LevelError
-	}
+// NewSlogHandler returns a slog.Handler that writes through this Logger's config,
+// inheriting level, caller, and separator settings.
+func (l *Logger) NewSlogHandler() slog.Handler {
+	return &SlogHandler{cfg: l.cfg}
 }
 
 // Enabled reports whether the handler handles records at the given level.
 func (h *SlogHandler) Enabled(_ context.Context, level slog.Level) bool {
-	return level >= h.level.Level()
+	if h.cfg.level == LevelMute {
+		return false
+	}
+	return Level(level) >= h.cfg.level
 }
 
 // Handle formats the slog.Record as logfmt and writes it to the output.
 func (h *SlogHandler) Handle(_ context.Context, r slog.Record) error {
-	buf := h.buf[:0]
+	buf := getb()
+	defer putb(buf)
 
-	buf = append(buf, "time="...)
-	buf = textenc.PutTime(buf, r.Time)
+	*buf = append(*buf, "time="...)
+	*buf = textenc.PutTime(*buf, r.Time)
 
-	buf = append(buf, " level="...)
-	buf = append(buf, slogLevelString(r.Level)...)
+	*buf = append(*buf, " level="...)
+	*buf = append(*buf, slogLevelString(r.Level)...)
 
-	// pre-attrs (from WithAttrs)
-	for _, a := range h.attrs {
-		buf = h.appendAttr(buf, a, h.group)
+	if h.cfg.caller && r.PC != 0 {
+		*buf = putSlogCaller(*buf, r.PC, h.cfg.sep)
 	}
 
-	// record attrs (from the log call)
+	if len(h.attrs) > 0 {
+		*buf = append(*buf, ' ')
+		*buf = append(*buf, h.attrs...)
+	}
+
 	r.Attrs(func(a slog.Attr) bool {
-		buf = h.appendAttr(buf, a, h.group)
+		*buf = appendSlogAttr(*buf, a, h.group)
 		return true
 	})
 
-	buf = append(buf, " msg="...)
-	buf = textenc.PutStringQuote(buf, r.Message)
-	buf = append(buf, '\n')
+	*buf = append(*buf, " msg="...)
+	*buf = textenc.PutStringQuote(*buf, r.Message)
+	*buf = append(*buf, '\n')
 
-	_, err := h.w.Write(buf)
-	h.buf = buf[:0]
+	_, err := h.cfg.out.Write(*buf)
 	return err
+}
+
+func putSlogCaller(dst []byte, pc uintptr, sep []string) []byte {
+	frames := runtime.CallersFrames([]uintptr{pc})
+	frame, _ := frames.Next()
+	file, line := frame.File, frame.Line
+	if file == "" {
+		file, line = "###", 0
+	} else if slash := lastSep(file, sep); slash >= 0 {
+		file = file[slash:]
+	}
+	dst = append(dst, " caller="...)
+	dst = textenc.PutString(dst, file)
+	dst = append(dst, ':')
+	return strconv.AppendInt(dst, int64(line), 10)
 }
 
 // WithAttrs returns a new Handler with the given attrs stored.
@@ -117,9 +109,11 @@ func (h *SlogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		return h
 	}
 	clone := *h
-	clone.attrs = make([]slog.Attr, 0, len(h.attrs)+len(attrs))
+	clone.attrs = make([]byte, len(h.attrs), len(h.attrs)+len(attrs)*16)
 	clone.attrs = append(clone.attrs, h.attrs...)
-	clone.attrs = append(clone.attrs, attrs...)
+	for _, attr := range attrs {
+		clone.attrs = appendSlogAttr(clone.attrs, attr, h.group)
+	}
 	return &clone
 }
 
@@ -137,20 +131,23 @@ func (h *SlogHandler) WithGroup(name string) slog.Handler {
 	return &clone
 }
 
-// appendAttr encodes a single slog.Attr in logfmt key=value format.
-// PutKeyRaw already adds a leading space separator.
-func (h *SlogHandler) appendAttr(dst []byte, a slog.Attr, group string) []byte {
+// appendSlogAttr encodes a single slog.Attr in logfmt key=value format.
+func appendSlogAttr(dst []byte, a slog.Attr, group string) []byte {
+	if a.Equal(slog.Attr{}) {
+		return dst
+	}
+	a.Value = a.Value.Resolve()
 	key := a.Key
 	if group != "" {
 		key = group + "." + key
 	}
 	if a.Value.Kind() == slog.KindGroup {
 		for _, sub := range a.Value.Group() {
-			dst = h.appendAttr(dst, sub, key)
+			dst = appendSlogAttr(dst, sub, key)
 		}
 		return dst
 	}
-	dst = textenc.PutKeyRaw(dst, key)
+	dst = textenc.PutKey(dst, key)
 	return appendSlogValue(dst, a.Value)
 }
 
@@ -176,73 +173,4 @@ func appendSlogValue(dst []byte, v slog.Value) []byte {
 	default:
 		return textenc.PutNil(dst)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// internal fallback handler for non-standard levels (LevelMute / custom)
-// ---------------------------------------------------------------------------
-
-type internalSlogHandler struct {
-	cfg   *config
-	level Level
-}
-
-func (h *internalSlogHandler) Enabled(_ context.Context, level slog.Level) bool {
-	return mapSlogLevel(level) >= h.level
-}
-
-func (h *internalSlogHandler) Handle(_ context.Context, r slog.Record) error {
-	if !h.Enabled(nil, r.Level) {
-		return nil
-	}
-	buf := getb()
-	defer putb(buf)
-
-	*buf = append(*buf, "time="...)
-	*buf = textenc.PutTime(*buf, r.Time)
-	putLevel(buf, mapSlogLevel(r.Level))
-
-	r.Attrs(func(a slog.Attr) bool {
-		*buf = append(*buf, ' ')
-		*buf = appendSlogAttrKV(*buf, a, "")
-		return true
-	})
-
-	*buf = append(*buf, " msg="...)
-	*buf = textenc.PutStringQuote(*buf, r.Message)
-	*buf = append(*buf, '\n')
-	h.cfg.out.Write(*buf)
-	return nil
-}
-
-func (h *internalSlogHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
-func (h *internalSlogHandler) WithGroup(name string) slog.Handler       { return h }
-
-func mapSlogLevel(lv slog.Level) Level {
-	switch {
-	case lv <= slog.LevelDebug:
-		return LevelDebug
-	case lv <= slog.LevelInfo:
-		return LevelInfo
-	case lv <= slog.LevelWarn:
-		return LevelWarn
-	default:
-		return LevelError
-	}
-}
-
-// appendSlogAttrKV is appendSlogValue + key without leading space.
-func appendSlogAttrKV(dst []byte, a slog.Attr, group string) []byte {
-	key := a.Key
-	if group != "" {
-		key = group + "." + key
-	}
-	if a.Value.Kind() == slog.KindGroup {
-		for _, sub := range a.Value.Group() {
-			dst = appendSlogAttrKV(dst, sub, key)
-		}
-		return dst
-	}
-	dst = textenc.PutKeyRaw(dst, key)
-	return appendSlogValue(dst, a.Value)
 }

@@ -4,10 +4,19 @@ import (
 	"bytes"
 	"io"
 	stdlog "log"
+	"log/slog"
 )
 
-// hijackstd hijacks standard library log output and redirects it to this library's logging system.
-func (l *Logger) hijackstd() {
+// dohijack hijacks standard library log and slog output,
+// redirecting both to this library's logging system.
+func (l *Logger) dohijack() {
+	// Hijack slog first. In Go 1.24, log is built on slog;
+	// setting slog's default first ensures log's output stays consistent.
+	sh := l.NewSlogHandler()
+	if sh != nil {
+		slog.SetDefault(slog.New(sh))
+	}
+
 	stdlog.SetFlags(0)
 	prefix := stdlog.Prefix()
 	stdlog.SetPrefix("")

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	stdlog "log"
-	"os"
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -14,18 +14,26 @@ func TestHijackLog(t *testing.T) {
 	prevOut := l.cfg.out
 	prevCaller := l.cfg.caller
 	prevLevel := l.cfg.level
+	prevSlog := slog.Default()
 	SetOutput(&buf)
 	SetCaller(false)
 	SetLevel(LINFO)
-	defer SetOutput(os.Stderr)
-	defer SetCaller(false)
-	defer SetLevel(prevLevel)
-	defer SetOutput(prevOut)
-	defer SetCaller(prevCaller)
-	l.hijackstd()
+	defer func() {
+		slog.SetDefault(prevSlog)
+		SetOutput(prevOut)
+		SetCaller(prevCaller)
+		SetLevel(prevLevel)
+	}()
+	l.dohijack()
 	stdlog.Println("xxxxxxxxxxxxxxx")
 	if got := buf.String(); !strings.Contains(got, `msg=xxxxxxxxxxxxxxx`) {
 		t.Fatalf("hijack msg mismatch: %s", got)
+	}
+
+	buf.Reset()
+	slog.Info("slog hijacked")
+	if got := buf.String(); !strings.Contains(got, `msg="slog hijacked"`) {
+		t.Fatalf("slog hijack msg mismatch: %s", got)
 	}
 }
 

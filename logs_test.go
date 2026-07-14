@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -407,6 +408,29 @@ func TestCallerLineNum(t *testing.T) {
 	expect := strconv.Itoa(baseLine + 1)
 	if !strings.Contains(got, ":"+expect+" ") {
 		t.Fatalf("caller line mismatch: expected :%s, got: %s", expect, got)
+	}
+}
+
+func TestPackageInfoCallerLineNum(t *testing.T) {
+	var buf bytes.Buffer
+	previousOut := l.cfg.out
+	previousCaller := l.cfg.caller
+	previousSkip := l.cfg.skip
+	l.cfg.setOutput(&buf)
+	l.cfg.setCaller(true)
+	l.cfg.setSkip(0)
+	defer func() {
+		l.cfg.setOutput(previousOut)
+		l.cfg.setCaller(previousCaller)
+		l.cfg.setSkip(previousSkip)
+	}()
+
+	_, _, baseLine, _ := runtime.Caller(0)
+	Info("package-line-test") // caller = baseLine + 1
+	got := buf.String()
+	expect := strconv.Itoa(baseLine + 1)
+	if !strings.Contains(got, ":"+expect+" ") {
+		t.Fatalf("package caller line mismatch: expected :%s, got: %s", expect, got)
 	}
 }
 
@@ -1171,6 +1195,32 @@ func TestHijackStdlibCaller(t *testing.T) {
 	// The caller should NOT be a stdlib file like log.go
 	if strings.Contains(got, "caller=/log.go:") || strings.Contains(got, "caller=/log/") {
 		t.Fatalf("caller points to stdlib log package: %s", got)
+	}
+}
+
+func TestNewLoggerConcurrentOutput(t *testing.T) {
+	var buf lockedBuffer
+	logger := New(&buf, WithHijack(false))
+	const workers = 16
+	const entries = 100
+
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for entry := 0; entry < entries; entry++ {
+				logger.Info("parallel", id, entry)
+			}
+		}(worker)
+	}
+	wg.Wait()
+
+	buf.mu.Lock()
+	lines := strings.Count(buf.b.String(), "\n")
+	buf.mu.Unlock()
+	if lines != workers*entries {
+		t.Fatalf("got %d lines, want %d", lines, workers*entries)
 	}
 }
 

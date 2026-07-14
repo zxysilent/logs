@@ -2,15 +2,18 @@ package logs
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestSlogHandlerBasic(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("hello world")
@@ -28,7 +31,7 @@ func TestSlogHandlerBasic(t *testing.T) {
 
 func TestSlogHandlerLevels(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, &SlogHandlerOptions{Level: slog.LevelWarn})
+	h := New(&buf, WithLevel(LevelWarn), WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	buf.Reset()
@@ -58,7 +61,7 @@ func TestSlogHandlerLevels(t *testing.T) {
 
 func TestSlogHandlerWithAttrs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.With("user", "alice", "age", 30).Info("login")
@@ -73,7 +76,7 @@ func TestSlogHandlerWithAttrs(t *testing.T) {
 
 func TestSlogHandlerWithGroup(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h.WithGroup("http"))
 
 	l.Info("request", "method", "GET", "status", 200)
@@ -88,7 +91,7 @@ func TestSlogHandlerWithGroup(t *testing.T) {
 
 func TestSlogHandlerDuration(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("slow", slog.Duration("elapsed", 2*time.Second+30*time.Millisecond))
@@ -100,7 +103,7 @@ func TestSlogHandlerDuration(t *testing.T) {
 
 func TestSlogHandlerTime(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	ts := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
@@ -113,7 +116,7 @@ func TestSlogHandlerTime(t *testing.T) {
 
 func TestSlogHandlerBool(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("check", "ok", true, "fail", false)
@@ -128,7 +131,7 @@ func TestSlogHandlerBool(t *testing.T) {
 
 func TestSlogHandlerFloat(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("metric", "rate", 0.95)
@@ -140,7 +143,7 @@ func TestSlogHandlerFloat(t *testing.T) {
 
 func TestSlogHandlerTypedArgs(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("stats",
@@ -166,7 +169,7 @@ func TestSlogHandlerTypedArgs(t *testing.T) {
 
 func TestSlogHandlerAny(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	type payload struct {
@@ -185,7 +188,7 @@ func TestSlogHandlerAny(t *testing.T) {
 
 func TestSlogHandlerLevelMapping(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, &SlogHandlerOptions{Level: slog.LevelDebug})
+	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	buf.Reset()
@@ -216,7 +219,7 @@ func TestSlogHandlerLevelMapping(t *testing.T) {
 func TestLoggerSlogHandler(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf, WithLevel(LevelInfo))
-	handler := l.SlogHandler()
+	handler := l.NewSlogHandler()
 	sl := slog.New(handler)
 
 	sl.Info("from slog")
@@ -228,7 +231,7 @@ func TestLoggerSlogHandler(t *testing.T) {
 
 func TestSlogHandlerLineBreak(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewSlogHandler(&buf, nil)
+	h := New(&buf, WithHijack(false)).NewSlogHandler()
 	l := slog.New(h)
 
 	l.Info("first")
@@ -237,5 +240,181 @@ func TestSlogHandlerLineBreak(t *testing.T) {
 	lines := strings.Count(got, "\n")
 	if lines != 2 {
 		t.Fatalf("expected 2 lines, got %d: %q", lines, got)
+	}
+}
+
+func TestSlogHandlerCaller(t *testing.T) {
+	var buf bytes.Buffer
+	h := New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler()
+	l := slog.New(h)
+
+	l.Info("with caller")
+	got := buf.String()
+	if !strings.Contains(got, "caller=") {
+		t.Fatalf("missing caller field, got: %s", got)
+	}
+	if !strings.Contains(got, "slog_test.go") {
+		t.Fatalf("caller should point to slog_test.go, got: %s", got)
+	}
+}
+
+func TestSlogHandlerCallerInherited(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf, WithCaller(true))
+	sl := slog.New(l.NewSlogHandler())
+
+	sl.Info("inherited caller")
+	got := buf.String()
+	if !strings.Contains(got, "caller=") {
+		t.Fatalf("missing inherited caller, got: %s", got)
+	}
+	if !strings.Contains(got, "slog_test.go") {
+		t.Fatalf("caller should point to slog_test.go, got: %s", got)
+	}
+}
+
+func TestDefaultSlogUsesDynamicLogsConfig(t *testing.T) {
+	var first bytes.Buffer
+	var second bytes.Buffer
+	logger := New(&first, WithHijack(false))
+	previous := slog.Default()
+	slog.SetDefault(slog.New(logger.NewSlogHandler()))
+	defer slog.SetDefault(previous)
+
+	slog.Info("first")
+	if !strings.Contains(first.String(), "msg=first") {
+		t.Fatalf("first output missing: %s", first.String())
+	}
+
+	logger.cfg.setOutput(&second)
+	logger.cfg.setLevel(LevelWarn)
+	slog.Info("filtered")
+	if second.Len() != 0 {
+		t.Fatalf("info should be filtered after logs level change: %s", second.String())
+	}
+	slog.Warn("second")
+	if !strings.Contains(second.String(), "msg=second") {
+		t.Fatalf("updated output missing: %s", second.String())
+	}
+}
+
+func TestRootNewSlogHandlerUsesPackageConfig(t *testing.T) {
+	var buf bytes.Buffer
+	previousOut := l.cfg.out
+	previousLevel := l.cfg.level
+	l.cfg.setOutput(&buf)
+	l.cfg.setLevel(LevelInfo)
+	defer func() {
+		l.cfg.setOutput(previousOut)
+		l.cfg.setLevel(previousLevel)
+	}()
+
+	logger := slog.New(NewSlogHandler())
+	logger.Info("root handler")
+	if !strings.Contains(buf.String(), `msg="root handler"`) {
+		t.Fatalf("root handler did not use package config: %s", buf.String())
+	}
+}
+
+func TestIndependentSlogIgnoresLogsConfig(t *testing.T) {
+	var buf bytes.Buffer
+	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).NewSlogHandler()
+	logger := slog.New(h)
+	previousOut := l.cfg.out
+	previousLevel := l.cfg.level
+
+	l.cfg.setOutput(io.Discard)
+	l.cfg.setLevel(LevelMute)
+	defer func() {
+		l.cfg.setOutput(previousOut)
+		l.cfg.setLevel(previousLevel)
+	}()
+
+	logger.Debug("independent")
+	if !strings.Contains(buf.String(), "msg=independent") {
+		t.Fatalf("independent handler should ignore package config: %s", buf.String())
+	}
+}
+
+func TestSlogWithAttrsGroupOrdering(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler()).
+		With("root", 1).
+		WithGroup("http").
+		With("method", "GET").
+		WithGroup("request")
+
+	logger.Info("done", "id", 7)
+	got := buf.String()
+	for _, want := range []string{"root=1", "http.method=GET", "http.request.id=7"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in %s", want, got)
+		}
+	}
+	if strings.Contains(got, "http.root=") || strings.Contains(got, "request.method=") {
+		t.Fatalf("group applied retroactively: %s", got)
+	}
+}
+
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+func TestSlogHandlerConcurrent(t *testing.T) {
+	var out lockedBuffer
+	logger := slog.New(New(&out, WithHijack(false)).NewSlogHandler())
+	const workers = 16
+	const entries = 100
+
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for i := 0; i < entries; i++ {
+				logger.Info("parallel", "worker", id, "entry", i)
+			}
+		}(worker)
+	}
+	wg.Wait()
+
+	out.mu.Lock()
+	lines := strings.Count(out.b.String(), "\n")
+	out.mu.Unlock()
+	if lines != workers*entries {
+		t.Fatalf("got %d lines, want %d", lines, workers*entries)
+	}
+}
+
+func TestDefaultSlogMuteFiltersCustomHighLevel(t *testing.T) {
+	var buf bytes.Buffer
+	logger := New(&buf, WithLevel(LevelMute), WithHijack(false))
+	h := logger.NewSlogHandler()
+	if h.Enabled(context.Background(), slog.Level(LevelMute+1)) {
+		t.Fatal("LevelMute must disable every slog level")
+	}
+}
+
+type slogTestValuer struct{}
+
+func (slogTestValuer) LogValue() slog.Value {
+	return slog.StringValue("resolved")
+}
+
+func TestSlogHandlerResolvesValuesAndQuotesKeys(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+	logger.Info("attrs", slog.Any("user name", slogTestValuer{}))
+
+	got := buf.String()
+	if !strings.Contains(got, `"user name"=resolved`) {
+		t.Fatalf("log valuer or quoted key missing: %s", got)
 	}
 }

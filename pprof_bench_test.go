@@ -21,6 +21,64 @@ type discardingWriter struct{}
 
 func (discardingWriter) Write(p []byte) (int, error) { return len(p), nil }
 
+var benchmarkDispatchLogger = New(io.Discard, WithHijack(false))
+var benchmarkInfoMethodValue = benchmarkDispatchLogger.Info
+
+func benchmarkInfoWrapper(args ...any) {
+	benchmarkDispatchLogger.Info(args...)
+}
+
+// ---------------------------------------------------------------------------
+// 导出方式调用开销
+// ---------------------------------------------------------------------------
+
+// BenchmarkInfoDispatchDirect measures a direct Logger method call.
+func BenchmarkInfoDispatchDirect(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		benchmarkDispatchLogger.Info("hello")
+	}
+}
+
+// BenchmarkInfoDispatchPackage measures the real package-level Info function.
+func BenchmarkInfoDispatchPackage(b *testing.B) {
+	previousOut := l.cfg.out
+	previousLevel := l.cfg.level
+	previousCaller := l.cfg.caller
+	l.cfg.out = io.Discard
+	l.cfg.level = LevelInfo
+	l.cfg.caller = false
+	b.Cleanup(func() {
+		l.cfg.out = previousOut
+		l.cfg.level = previousLevel
+		l.cfg.caller = previousCaller
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		Info("hello")
+	}
+}
+
+// BenchmarkInfoDispatchMethodValue measures a bound method-value variable,
+// equivalent to: var Info = l.Info.
+func BenchmarkInfoDispatchMethodValue(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		benchmarkInfoMethodValue("hello")
+	}
+}
+
+// BenchmarkInfoDispatchWrapper measures a package wrapper function,
+// equivalent to: func Info(args ...any) { l.Info(args...) }.
+func BenchmarkInfoDispatchWrapper(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		benchmarkInfoWrapper("hello")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 基础场景
 // ---------------------------------------------------------------------------
