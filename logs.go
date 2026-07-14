@@ -76,43 +76,82 @@ func SetTrace(trace string) {
 	l.trace = trace
 }
 
-// The following functions use method-valued variables instead of wrapper
-// functions to keep the caller skip depth identical: logs.Debug and l.Debug
-// produce the same caller:file:line. Wrapping with `func Debug(...) { l.Debug(...) }`
-// would add one extra frame, pushing the caller one level further.
-
 // Debug logs at debug level.
-var Debug = l.Debug
+func Debug(args ...any) {
+	if LevelDebug >= l.cfg.level {
+		l.cfg.print(l.trace, LevelDebug, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // Debugf logs a formatted message at debug level.
-var Debugf = l.Debugf
+func Debugf(format string, args ...any) {
+	if LevelDebug >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelDebug, l.cfg.caller, l.preb(), format, args...)
+	}
+}
 
 // Info logs at info level.
-var Info = l.Info
+func Info(args ...any) {
+	if LevelInfo >= l.cfg.level {
+		l.cfg.print(l.trace, LevelInfo, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // Infof logs a formatted message at info level.
-var Infof = l.Infof
+func Infof(format string, args ...any) {
+	if LevelInfo >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelInfo, l.cfg.caller, l.preb(), format, args...)
+	}
+}
 
 // Warn logs at warn level.
-var Warn = l.Warn
+func Warn(args ...any) {
+	if LevelWarn >= l.cfg.level {
+		l.cfg.print(l.trace, LevelWarn, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // Warnf logs a formatted message at warn level.
-var Warnf = l.Warnf
+func Warnf(format string, args ...any) {
+	if LevelWarn >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelWarn, l.cfg.caller, l.preb(), format, args...)
+	}
+}
 
 // Error logs at error level.
-var Error = l.Error
+func Error(args ...any) {
+	if LevelError >= l.cfg.level {
+		l.cfg.print(l.trace, LevelError, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // Errorf logs a formatted message at error level.
-var Errorf = l.Errorf
+func Errorf(format string, args ...any) {
+	if LevelError >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelError, l.cfg.caller, l.preb(), format, args...)
+	}
+}
 
 // Print logs at info level (stdlib-compatible).
-var Print = l.Print
+func Print(args ...any) {
+	if LevelInfo >= l.cfg.level {
+		l.cfg.print(l.trace, LevelInfo, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // Printf logs a formatted message at info level (stdlib-compatible).
-var Printf = l.Printf
+func Printf(format string, args ...any) {
+	if LevelInfo >= l.cfg.level {
+		l.cfg.printf(l.trace, LevelInfo, l.cfg.caller, l.preb(), format, args...)
+	}
+}
 
 // Println logs at info level (stdlib-compatible).
-var Println = l.Println
+func Println(args ...any) {
+	if LevelInfo >= l.cfg.level {
+		l.cfg.print(l.trace, LevelInfo, l.cfg.caller, l.preb(), args...)
+	}
+}
 
 // With is the field logging entry.
 func With(trace ...string) *fielder {
