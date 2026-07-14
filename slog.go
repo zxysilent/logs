@@ -89,13 +89,14 @@ func (h *slogHandler) Handle(_ context.Context, r slog.Record) error {
 }
 
 func putSlogCaller(dst []byte, pc uintptr, sep []string) []byte {
-	frames := runtime.CallersFrames([]uintptr{pc})
-	frame, _ := frames.Next()
-	file, line := frame.File, frame.Line
-	if file == "" {
-		file, line = "###", 0
-	} else if slash := lastSep(file, sep); slash >= 0 {
-		file = file[slash:]
+	file := "###"
+	line := 0
+	pc-- // slog.Record.PC is the return PC after the call instruction.
+	if fn := runtime.FuncForPC(pc); fn != nil {
+		file, line = fn.FileLine(pc)
+		if slash := lastSep(file, sep); slash >= 0 {
+			file = file[slash:]
+		}
 	}
 	dst = append(dst, " caller="...)
 	dst = textenc.PutString(dst, file)

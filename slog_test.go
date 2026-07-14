@@ -5,6 +5,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -256,6 +258,48 @@ func TestSlogHandlerCaller(t *testing.T) {
 	if !strings.Contains(got, "slog_test.go") {
 		t.Fatalf("caller should point to slog_test.go, got: %s", got)
 	}
+}
+
+func assertSlogCallerLine(t *testing.T, got string, line int) {
+	t.Helper()
+	want := ":" + strconv.Itoa(line) + " "
+	if !strings.Contains(got, want) {
+		t.Fatalf("caller line mismatch: want %q in %q", want, got)
+	}
+}
+
+func TestSlogHandlerCallerExactLine(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler())
+
+	_, _, line, _ := runtime.Caller(0)
+	logger.Info("direct")
+	assertSlogCallerLine(t, buf.String(), line+1)
+
+	buf.Reset()
+	_, _, line, _ = runtime.Caller(0)
+	logger.With("key", "value").Info("with")
+	assertSlogCallerLine(t, buf.String(), line+1)
+
+	buf.Reset()
+	_, _, line, _ = runtime.Caller(0)
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "attrs", slog.Int("key", 1))
+	assertSlogCallerLine(t, buf.String(), line+1)
+}
+
+//go:noinline
+func slogInfoNoInline(logger *slog.Logger) int {
+	_, _, line, _ := runtime.Caller(0)
+	logger.Info("noinline")
+	return line + 1
+}
+
+func TestSlogHandlerCallerNoInlineWrapper(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler())
+
+	wantLine := slogInfoNoInline(logger)
+	assertSlogCallerLine(t, buf.String(), wantLine)
 }
 
 func TestSlogHandlerCallerInherited(t *testing.T) {
