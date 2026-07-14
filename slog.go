@@ -23,14 +23,14 @@ func slogLevelString(lv slog.Level) string {
 	}
 }
 
-// SlogHandler adapts the logs library as a slog.Handler, writing key=value
-// logfmt output through the given io.Writer.
+// slogHandler adapts the logs library as a slog.Handler, writing key=value
+// logfmt output through the configured writer.
 //
 // Usage:
 //
 //	logger := slog.New(logs.NewSlogHandler())
 //	logger.Info("hello", "key", "value")
-type SlogHandler struct {
+type slogHandler struct {
 	cfg   *config
 	group string
 	attrs []byte
@@ -44,11 +44,11 @@ func NewSlogHandler() slog.Handler {
 // NewSlogHandler returns a slog.Handler that writes through this Logger's config,
 // inheriting level, caller, and separator settings.
 func (l *Logger) NewSlogHandler() slog.Handler {
-	return &SlogHandler{cfg: l.cfg}
+	return &slogHandler{cfg: l.cfg}
 }
 
 // Enabled reports whether the handler handles records at the given level.
-func (h *SlogHandler) Enabled(_ context.Context, level slog.Level) bool {
+func (h *slogHandler) Enabled(_ context.Context, level slog.Level) bool {
 	if h.cfg.level == LevelMute {
 		return false
 	}
@@ -56,7 +56,7 @@ func (h *SlogHandler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 // Handle formats the slog.Record as logfmt and writes it to the output.
-func (h *SlogHandler) Handle(_ context.Context, r slog.Record) error {
+func (h *slogHandler) Handle(_ context.Context, r slog.Record) error {
 	buf := getb()
 	defer putb(buf)
 
@@ -104,7 +104,7 @@ func putSlogCaller(dst []byte, pc uintptr, sep []string) []byte {
 }
 
 // WithAttrs returns a new Handler with the given attrs stored.
-func (h *SlogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (h *slogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	if len(attrs) == 0 {
 		return h
 	}
@@ -118,7 +118,7 @@ func (h *SlogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 // WithGroup returns a new Handler with the given group appended.
-func (h *SlogHandler) WithGroup(name string) slog.Handler {
+func (h *slogHandler) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return h
 	}
