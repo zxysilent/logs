@@ -28,7 +28,7 @@ func slogLevelString(lv slog.Level) string {
 //
 // Usage:
 //
-//	logger := slog.New(logs.NewSlogHandler())
+//	logger := slog.New(logs.SlogHandler())
 //	logger.Info("hello", "key", "value")
 type slogHandler struct {
 	cfg   *config
@@ -36,14 +36,14 @@ type slogHandler struct {
 	attrs []byte
 }
 
-// NewSlogHandler returns a handler backed by the package-level logs config.
-func NewSlogHandler() slog.Handler {
-	return l.NewSlogHandler()
+// SlogHandler returns a handler backed by the package-level logs config.
+func SlogHandler() slog.Handler {
+	return l.SlogHandler()
 }
 
-// NewSlogHandler returns a slog.Handler that writes through this Logger's config,
+// SlogHandler returns a slog.Handler that writes through this Logger's config,
 // inheriting level, caller, and separator settings.
-func (l *Logger) NewSlogHandler() slog.Handler {
+func (l *Logger) SlogHandler() slog.Handler {
 	return &slogHandler{cfg: l.cfg}
 }
 

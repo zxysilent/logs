@@ -64,7 +64,7 @@ func Example_slogDefault() {
 	previous := slog.Default()
 	defer slog.SetDefault(previous)
 
-	slog.SetDefault(slog.New(logs.NewSlogHandler()))
+	slog.SetDefault(slog.New(logs.SlogHandler()))
 	slog.Info("request handled", "method", "GET", "status", 200)
 	// Output:
 }
@@ -75,7 +75,7 @@ func Example_slogLogger() {
 		logs.WithCaller(true),
 		logs.WithHijack(false),
 	)
-	logger := slog.New(l.NewSlogHandler())
+	logger := slog.New(l.SlogHandler())
 
 	logger.Info("request handled",
 		slog.String("method", "GET"),
@@ -90,7 +90,7 @@ func Example_slogLevels() {
 		logs.WithLevel(logs.LevelWarn),
 		logs.WithHijack(false),
 	)
-	logger := slog.New(l.NewSlogHandler())
+	logger := slog.New(l.SlogHandler())
 
 	logger.Debug("filtered debug message")
 	logger.Warn("visible warning")
@@ -100,7 +100,7 @@ func Example_slogLevels() {
 // Example: With attaches attributes reused by subsequent records.
 func Example_slogWith() {
 	l := logs.New(os.Stderr, logs.WithHijack(false))
-	logger := slog.New(l.NewSlogHandler()).With(
+	logger := slog.New(l.SlogHandler()).With(
 		"service", "payments",
 		"version", 2,
 	)
@@ -113,7 +113,7 @@ func Example_slogWith() {
 // Example: slog groups are encoded as dotted logfmt keys.
 func Example_slogGroup() {
 	l := logs.New(os.Stderr, logs.WithHijack(false))
-	logger := slog.New(l.NewSlogHandler())
+	logger := slog.New(l.SlogHandler())
 
 	// Group attributes are encoded as request.method and request.path.
 	logger.Info("request received",
@@ -128,7 +128,7 @@ func Example_slogGroup() {
 // Example: LogAttrs records strongly typed attributes without key/value pairs.
 func Example_slogLogAttrs() {
 	l := logs.New(os.Stderr, logs.WithHijack(false))
-	logger := slog.New(l.NewSlogHandler())
+	logger := slog.New(l.SlogHandler())
 
 	logger.LogAttrs(context.Background(), slog.LevelInfo, "request completed",
 		slog.String("method", "GET"),
@@ -154,7 +154,7 @@ func (u exampleSlogUser) LogValue() slog.Value {
 // Example: LogValuer controls how a custom value is represented.
 func Example_slogLogValuer() {
 	l := logs.New(os.Stderr, logs.WithHijack(false))
-	logger := slog.New(l.NewSlogHandler())
+	logger := slog.New(l.SlogHandler())
 
 	// LogValue expands user into user.id and user.name.
 	logger.Info("user authenticated", "user", exampleSlogUser{ID: 42, Name: "alice"})

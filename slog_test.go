@@ -15,7 +15,7 @@ import (
 
 func TestSlogHandlerBasic(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("hello world")
@@ -33,7 +33,7 @@ func TestSlogHandlerBasic(t *testing.T) {
 
 func TestSlogHandlerLevels(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithLevel(LevelWarn), WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithLevel(LevelWarn), WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	buf.Reset()
@@ -63,7 +63,7 @@ func TestSlogHandlerLevels(t *testing.T) {
 
 func TestSlogHandlerWithAttrs(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.With("user", "alice", "age", 30).Info("login")
@@ -78,7 +78,7 @@ func TestSlogHandlerWithAttrs(t *testing.T) {
 
 func TestSlogHandlerWithGroup(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h.WithGroup("http"))
 
 	l.Info("request", "method", "GET", "status", 200)
@@ -93,7 +93,7 @@ func TestSlogHandlerWithGroup(t *testing.T) {
 
 func TestSlogHandlerDuration(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("slow", slog.Duration("elapsed", 2*time.Second+30*time.Millisecond))
@@ -105,7 +105,7 @@ func TestSlogHandlerDuration(t *testing.T) {
 
 func TestSlogHandlerTime(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	ts := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
@@ -118,7 +118,7 @@ func TestSlogHandlerTime(t *testing.T) {
 
 func TestSlogHandlerBool(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("check", "ok", true, "fail", false)
@@ -133,7 +133,7 @@ func TestSlogHandlerBool(t *testing.T) {
 
 func TestSlogHandlerFloat(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("metric", "rate", 0.95)
@@ -145,7 +145,7 @@ func TestSlogHandlerFloat(t *testing.T) {
 
 func TestSlogHandlerTypedArgs(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("stats",
@@ -171,7 +171,7 @@ func TestSlogHandlerTypedArgs(t *testing.T) {
 
 func TestSlogHandlerAny(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	type payload struct {
@@ -190,7 +190,7 @@ func TestSlogHandlerAny(t *testing.T) {
 
 func TestSlogHandlerLevelMapping(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	buf.Reset()
@@ -221,7 +221,7 @@ func TestSlogHandlerLevelMapping(t *testing.T) {
 func TestLoggerSlogHandler(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf, WithLevel(LevelInfo))
-	handler := l.NewSlogHandler()
+	handler := l.SlogHandler()
 	sl := slog.New(handler)
 
 	sl.Info("from slog")
@@ -233,7 +233,7 @@ func TestLoggerSlogHandler(t *testing.T) {
 
 func TestSlogHandlerLineBreak(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("first")
@@ -247,7 +247,7 @@ func TestSlogHandlerLineBreak(t *testing.T) {
 
 func TestSlogHandlerCaller(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithCaller(true), WithHijack(false)).SlogHandler()
 	l := slog.New(h)
 
 	l.Info("with caller")
@@ -270,7 +270,7 @@ func assertSlogCallerLine(t *testing.T, got string, line int) {
 
 func TestSlogHandlerCallerExactLine(t *testing.T) {
 	var buf bytes.Buffer
-	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).SlogHandler())
 
 	_, _, line, _ := runtime.Caller(0)
 	logger.Info("direct")
@@ -296,7 +296,7 @@ func slogInfoNoInline(logger *slog.Logger) int {
 
 func TestSlogHandlerCallerNoInlineWrapper(t *testing.T) {
 	var buf bytes.Buffer
-	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(&buf, WithCaller(true), WithHijack(false)).SlogHandler())
 
 	wantLine := slogInfoNoInline(logger)
 	assertSlogCallerLine(t, buf.String(), wantLine)
@@ -305,7 +305,7 @@ func TestSlogHandlerCallerNoInlineWrapper(t *testing.T) {
 func TestSlogHandlerCallerInherited(t *testing.T) {
 	var buf bytes.Buffer
 	l := New(&buf, WithCaller(true))
-	sl := slog.New(l.NewSlogHandler())
+	sl := slog.New(l.SlogHandler())
 
 	sl.Info("inherited caller")
 	got := buf.String()
@@ -322,7 +322,7 @@ func TestDefaultSlogUsesDynamicLogsConfig(t *testing.T) {
 	var second bytes.Buffer
 	logger := New(&first, WithHijack(false))
 	previous := slog.Default()
-	slog.SetDefault(slog.New(logger.NewSlogHandler()))
+	slog.SetDefault(slog.New(logger.SlogHandler()))
 	defer slog.SetDefault(previous)
 
 	slog.Info("first")
@@ -353,7 +353,7 @@ func TestRootNewSlogHandlerUsesPackageConfig(t *testing.T) {
 		l.cfg.setLevel(previousLevel)
 	}()
 
-	logger := slog.New(NewSlogHandler())
+	logger := slog.New(SlogHandler())
 	logger.Info("root handler")
 	if !strings.Contains(buf.String(), `msg="root handler"`) {
 		t.Fatalf("root handler did not use package config: %s", buf.String())
@@ -362,7 +362,7 @@ func TestRootNewSlogHandlerUsesPackageConfig(t *testing.T) {
 
 func TestIndependentSlogIgnoresLogsConfig(t *testing.T) {
 	var buf bytes.Buffer
-	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).NewSlogHandler()
+	h := New(&buf, WithLevel(LevelDebug), WithHijack(false)).SlogHandler()
 	logger := slog.New(h)
 	previousOut := l.cfg.out
 	previousLevel := l.cfg.level
@@ -382,7 +382,7 @@ func TestIndependentSlogIgnoresLogsConfig(t *testing.T) {
 
 func TestSlogWithAttrsGroupOrdering(t *testing.T) {
 	var buf bytes.Buffer
-	logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler()).
+	logger := slog.New(New(&buf, WithHijack(false)).SlogHandler()).
 		With("root", 1).
 		WithGroup("http").
 		With("method", "GET").
@@ -413,7 +413,7 @@ func (b *lockedBuffer) Write(p []byte) (int, error) {
 
 func TestSlogHandlerConcurrent(t *testing.T) {
 	var out lockedBuffer
-	logger := slog.New(New(&out, WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(&out, WithHijack(false)).SlogHandler())
 	const workers = 16
 	const entries = 100
 
@@ -440,7 +440,7 @@ func TestSlogHandlerConcurrent(t *testing.T) {
 func TestDefaultSlogMuteFiltersCustomHighLevel(t *testing.T) {
 	var buf bytes.Buffer
 	logger := New(&buf, WithLevel(LevelMute), WithHijack(false))
-	h := logger.NewSlogHandler()
+	h := logger.SlogHandler()
 	if h.Enabled(context.Background(), slog.Level(LevelMute+1)) {
 		t.Fatal("LevelMute must disable every slog level")
 	}
@@ -454,7 +454,7 @@ func (slogTestValuer) LogValue() slog.Value {
 
 func TestSlogHandlerResolvesValuesAndQuotesKeys(t *testing.T) {
 	var buf bytes.Buffer
-	logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(&buf, WithHijack(false)).SlogHandler())
 	logger.Info("attrs", slog.Any("user name", slogTestValuer{}))
 
 	got := buf.String()
@@ -470,7 +470,7 @@ func FuzzSlogHandler(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, msg, key, value string, number int64) {
 		var buf bytes.Buffer
-		logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+		logger := slog.New(New(&buf, WithHijack(false)).SlogHandler())
 
 		logger.Info(msg, slog.String(key, value), slog.Int64("number", number))
 		logger.With(slog.String(key, value)).Info(msg)
@@ -509,7 +509,7 @@ func FuzzSlogLogValuer(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, msg, key, value string, number int64) {
 		var buf bytes.Buffer
-		logger := slog.New(New(&buf, WithHijack(false)).NewSlogHandler())
+		logger := slog.New(New(&buf, WithHijack(false)).SlogHandler())
 
 		logger.Info(msg, slog.Any("value", fuzzSlogValuer{
 			key:    key,
@@ -531,7 +531,7 @@ func FuzzSlogLogValuer(f *testing.F) {
 }
 
 func BenchmarkSlogBasic(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(io.Discard, WithHijack(false)).SlogHandler())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
@@ -540,7 +540,7 @@ func BenchmarkSlogBasic(b *testing.B) {
 }
 
 func BenchmarkSlogAttrs(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(io.Discard, WithHijack(false)).SlogHandler())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
@@ -549,7 +549,7 @@ func BenchmarkSlogAttrs(b *testing.B) {
 }
 
 func BenchmarkSlogWithAttrs(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler()).With(
+	logger := slog.New(New(io.Discard, WithHijack(false)).SlogHandler()).With(
 		"service", "api",
 		"version", 2,
 		"production", true,
@@ -562,7 +562,7 @@ func BenchmarkSlogWithAttrs(b *testing.B) {
 }
 
 func BenchmarkSlogGroup(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(io.Discard, WithHijack(false)).SlogHandler())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
@@ -575,7 +575,7 @@ func BenchmarkSlogGroup(b *testing.B) {
 }
 
 func BenchmarkSlogCaller(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithCaller(true), WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(io.Discard, WithCaller(true), WithHijack(false)).SlogHandler())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
@@ -584,7 +584,7 @@ func BenchmarkSlogCaller(b *testing.B) {
 }
 
 func BenchmarkSlogFiltered(b *testing.B) {
-	logger := slog.New(New(io.Discard, WithLevel(LevelWarn), WithHijack(false)).NewSlogHandler())
+	logger := slog.New(New(io.Discard, WithLevel(LevelWarn), WithHijack(false)).SlogHandler())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {

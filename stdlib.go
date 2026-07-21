@@ -12,7 +12,7 @@ import (
 func (l *Logger) dohijack() {
 	// Hijack slog first. In Go 1.24, log is built on slog;
 	// setting slog's default first ensures log's output stays consistent.
-	sh := l.NewSlogHandler()
+	sh := l.SlogHandler()
 	if sh != nil {
 		slog.SetDefault(slog.New(sh))
 	}
