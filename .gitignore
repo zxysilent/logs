@@ -1,5 +1,5 @@
 logs/*
+*.prof
 cover.out
 cover.html
-cpu.prof
 docs/*
