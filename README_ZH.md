@@ -11,7 +11,7 @@
 - **链路追踪**：`TraceCtx` / `TraceId` / `Ctx`
 - **自动劫持标准库** `log`：`New()` 自动转换 stdlog → logfmt（可用 `WithHijack(false)` 关闭）
 - **兼容标准库签名**：`Print/Printf/Println`
-- **写入文件**：按天切分，可设最大天数/单文件大小，默认同时输出控制台，也可关闭
+- **写入文件**：按天切分，可设最大保留天数/单文件大小；可选控制台输出和按天归档压缩
 - **高性能**：关键路径零分配，`sync.Pool` 复用 buffer
 
 ---
@@ -57,7 +57,11 @@ func main() {
 
     // === 自定义实例 (文件输出) ===
     // 自定义实例 caller skip 已自动对齐，若封装在辅助函数中需加 WithSkip(1)
-    w, closeFn := logs.NewFile("./logs/app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+    w, closeFn := logs.NewFile(
+        "./logs/app.log",
+        logs.WithMaxAge(7), logs.WithMaxSize(64),
+        logs.WithConsole(true), logs.WithCompress(true),
+    )
     defer closeFn()
     applog := logs.New(w, logs.WithLevel(logs.LevelInfo))
     applog.Info("app started")
@@ -106,6 +110,7 @@ logs.SetFile(path string)                           // 设置文件输出
 logs.SetMaxAge(ma int)                              // 最大保留天数，默认 64
 logs.SetMaxSize(ms int64)                           // 单文件最大容量(MiB)，默认 64
 logs.SetConsole(b bool)                             // 同时输出控制台 (推荐)
+logs.SetCompress(b bool)                            // 将较旧备份按天归档为 tar.gz，默认关闭
 logs.SetTrace(trace string)                          // 设置默认实例命名空间
 logs.Close() error                                  // 关闭
 
@@ -158,8 +163,12 @@ helper := func(msg string) {
 _ = logs.New(w, logs.WithCaller(true), logs.WithSkip(1))
 _ = helper // 调用 helper("msg") 时 caller 指向 helper 的调用者
 
-// 文件输出：NewFile 返回 Writer + 关闭句柄，可选 WithMaxAge/WithMaxSize/WithConsole
-w, closeFn := logs.NewFile("app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+// 文件输出：NewFile 返回 Writer + 关闭句柄；压缩需显式开启
+w, closeFn := logs.NewFile(
+    "app.log",
+    logs.WithMaxAge(7), logs.WithMaxSize(64),
+    logs.WithConsole(true), logs.WithCompress(true),
+)
 defer closeFn()
 fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
@@ -169,6 +178,8 @@ l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
 l.Trace(trace string) *Logger      // 命名空间子 Logger（共享根配置）
 l.Clone(trace ...string) *Logger // 纯复制（无参）或追加 trace（有参），共享根配置
 ```
+
+`WithCompress(true)` 会将超过 `min(7, max(1, maxage/2))` 天的备份按天打包为 `.tar.gz`。该功能默认关闭，后台清理/归档会在下一次跨日写入时触发。
 
 ### 命名空间 / 子 Logger
 

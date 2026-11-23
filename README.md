@@ -11,7 +11,7 @@
 - **Distributed tracing**: `TraceCtx` / `TraceId` / `Ctx`
 - **Auto-hijack stdlib** `log`: `New()` converts stdlog → logfmt automatically
 - **Stdlib-compatible signatures**: `Print/Printf/Println`
-- **File output**: daily rotation, configurable max age/size, optional console mirroring
+- **File output**: daily rotation, configurable max age/size, optional console mirroring and per-day archive compression
 - **High performance**: zero-allocation fast path, `sync.Pool` buffer reuse
 
 ---
@@ -57,7 +57,11 @@ func main() {
 
     // === Custom instance (file output) ===
     // Custom instances have correct caller skip; add WithSkip(1) if wrapped in a helper
-    w, closeFn := logs.NewFile("./logs/app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+    w, closeFn := logs.NewFile(
+        "./logs/app.log",
+        logs.WithMaxAge(7), logs.WithMaxSize(64),
+        logs.WithConsole(true), logs.WithCompress(true),
+    )
     defer closeFn()
     applog := logs.New(w, logs.WithLevel(logs.LevelInfo))
     applog.Info("app started")
@@ -107,6 +111,7 @@ logs.SetFile(path string)                           // set file output
 logs.SetMaxAge(ma int)                              // max retention days, default 64
 logs.SetMaxSize(ms int64)                           // max file size (MiB), default 64
 logs.SetConsole(b bool)                             // also print to stderr (recommended)
+logs.SetCompress(b bool)                            // archive old backups as daily tar.gz files; default false
 logs.SetTrace(trace string)                          // set namespace on default instance
 logs.Close() error                                  // close
 
@@ -159,8 +164,12 @@ helper := func(msg string) {
 _ = logs.New(w, logs.WithCaller(true), logs.WithSkip(1))
 _ = helper // caller(file:line) points to the caller of helper("msg")
 
-// File output: NewFile returns the Writer + a close handle; optional WithMaxAge/WithMaxSize/WithConsole
-w, closeFn := logs.NewFile("app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+// File output: NewFile returns the Writer + a close handle; compression is opt-in
+w, closeFn := logs.NewFile(
+    "app.log",
+    logs.WithMaxAge(7), logs.WithMaxSize(64),
+    logs.WithConsole(true), logs.WithCompress(true),
+)
 defer closeFn()
 fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
@@ -170,6 +179,8 @@ l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
 l.Trace(trace string) *Logger      // namespaced sub-logger (shares root config)
 l.Clone(trace ...string) *Logger  // copy (no args) or append trace
 ```
+
+`WithCompress(true)` archives backups older than `min(7, max(1, maxage/2))` days into per-day `.tar.gz` files. Archiving is disabled by default and the background sweep runs on the next day-crossing write.
 
 ### Namespace / sub-Logger
 

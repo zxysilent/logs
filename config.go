@@ -74,6 +74,10 @@ func WithMaxSize(ms int64) FileOption { return func(fw *file.Writer) { fw.SetMax
 // WithConsole sets whether to also output to the console.
 func WithConsole(b bool) FileOption { return func(fw *file.Writer) { fw.SetConsole(b) } }
 
+// WithCompress sets whether to archive rotated backups older than the
+// compress threshold into per-day tar.gz files.
+func WithCompress(b bool) FileOption { return func(fw *file.Writer) { fw.SetCompress(b) } }
+
 // ----- Runtime modification entry (for package-level default instance only) -----
 
 // setLevel sets the log level.
@@ -145,6 +149,15 @@ func (c *config) setConsole(b bool) {
 		return
 	}
 	c.fw.SetConsole(b)
+}
+
+// setCompress toggles per-day tar.gz archiving on the file writer
+// (no-op without a file writer).
+func (c *config) setCompress(b bool) {
+	if c.fw == nil {
+		return
+	}
+	c.fw.SetCompress(b)
 }
 
 // close closes the underlying file writer if any. file.Writer.Close is idempotent (CAS).

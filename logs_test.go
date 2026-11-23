@@ -8,6 +8,7 @@ import (
 	"io"
 	stdlog "log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -106,6 +107,7 @@ func TestConfigFallback(t *testing.T) {
 	l.cfg.setSep("/")
 	l.cfg.setSkip(2)
 	l.cfg.setMaxSize(1024)
+	l.cfg.setCompress(true) // no-op without a file writer
 	ctx := TraceCtx(context.TODO())
 	l.Ctx(ctx).Debug("Debug")
 	l.Ctx(ctx).Debugf("%s", "Debugf")
@@ -236,6 +238,44 @@ func BenchmarkLog(b *testing.B) {
 		l.Info()
 	}
 }
+
+// TestNewFileCompressOption verifies the WithCompress FileOption wires through:
+// a day-crossing write sweeps leftover old backups into a tar.gz archive.
+func TestNewFileCompressOption(t *testing.T) {
+	dir := t.TempDir()
+	oldDay := time.Now().AddDate(0, 0, -9)
+	backup := filepath.Join(dir, "app."+oldDay.Format("2006-01-02-150405")+".log")
+	if err := os.WriteFile(backup, []byte("legacy line"), 0o644); err != nil {
+		t.Fatalf("create backup failed: %v", err)
+	}
+
+	w, closeFn := NewFile(filepath.Join(dir, "app.log"), WithConsole(false), WithCompress(true))
+	defer closeFn()
+
+	// Two writes with different dates trigger the day-crossing sweep.
+	today := time.Now().Format("2006-01-02")
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	if _, err := w.Write([]byte("time=" + today + "T00:00:00 first\n")); err != nil {
+		t.Fatalf("first write failed: %v", err)
+	}
+	if _, err := w.Write([]byte("time=" + yesterday + "T00:00:00 second\n")); err != nil {
+		t.Fatalf("second write failed: %v", err)
+	}
+
+	// The sweep runs asynchronously; wait for the archive.
+	archive := filepath.Join(dir, "app."+oldDay.Format("2006-01-02")+".tar.gz")
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(archive); err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("archive not created after day-crossing write: %s", archive)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func BenchmarkParallelFile(b *testing.B) {
 	w, closeFn := NewFile("./logs/app.log", WithConsole(false))
 	defer closeFn()
