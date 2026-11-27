@@ -1,6 +1,6 @@
 # logs — Registro Estructurado Simple y Rápido para Go
 
-[文档中文](README_ZH.md)
+[English](README.md) · [中文](README_ZH.md)
 
 ## Características
 
@@ -11,7 +11,7 @@
 - **Traza distribuida**: `TraceCtx` / `TraceId` / `Ctx`
 - **Secuestro automático de stdlib** `log`: `New()` convierte stdlog → logfmt automáticamente
 - **Firmas compatibles con stdlib**: `Print/Printf/Println`
-- **Salida a archivo**: rotación diaria, edad máxima/tamaño configurables, espejo opcional a consola
+- **Salida a archivo**: rotación diaria, edad máxima/tamaño configurables, espejo opcional a consola y compresión de archivos por día
 - **Alto rendimiento**: ruta rápida sin asignación, reutilización de búfer `sync.Pool`
 
 > **Nota de versión**: v0.12.x requiere **Go 1.24+**.  
@@ -60,7 +60,11 @@ func main() {
 
     // === Instancia personalizada (salida a archivo) ===
     // Las instancias personalizadas tienen el salto de llamante correcto; agregue WithSkip(1) si está envuelto en un helper
-    w, closeFn := logs.NewFile("./logs/app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+    w, closeFn := logs.NewFile(
+        "./logs/app.log",
+        logs.WithMaxAge(64), logs.WithMaxSize(64),
+        logs.WithConsole(true), logs.WithCompress(true),
+    )
     defer closeFn()
     applog := logs.New(w, logs.WithLevel(logs.LevelInfo))
     applog.Info("app started")
@@ -110,6 +114,7 @@ logs.SetFile(path string)                           // establecer salida a archi
 logs.SetMaxAge(ma int)                              // días máximos de retención, por defecto 64
 logs.SetMaxSize(ms int64)                           // tamaño máximo del archivo (MiB), por defecto 64
 logs.SetConsole(b bool)                             // también imprimir en stderr (recomendado)
+logs.SetCompress(b bool)                            // archiva copias antiguas como tar.gz diarios; por defecto false
 logs.SetTrace(trace string)                          // establecer espacio de nombres en la instancia predeterminada
 logs.Close() error                                    // cerrar
 
@@ -162,8 +167,12 @@ helper := func(msg string) {
 _ = logs.New(w, logs.WithCaller(true), logs.WithSkip(1))
 _ = helper // caller(file:line) apunta al llamante de helper("msg")
 
-// Salida a archivo: NewFile devuelve el Writer + un control de cierre; WithMaxAge/WithMaxSize/WithConsole opcionales
-w, closeFn := logs.NewFile("app.log", logs.WithMaxAge(7), logs.WithMaxSize(64), logs.WithConsole(true))
+// Salida a archivo: NewFile devuelve el Writer + un control de cierre; la compresión es opcional
+w, closeFn := logs.NewFile(
+    "app.log",
+    logs.WithMaxAge(64), logs.WithMaxSize(64),
+    logs.WithConsole(true), logs.WithCompress(true),
+)
 defer closeFn()
 fl := logs.New(w)
 l.Debug(...)  l.Debugf(...)  l.Info(...)  l.Infof(...)
@@ -173,6 +182,8 @@ l.With(trace ...string) *fielder   l.Ctx(ctx) *fielder
 l.Trace(trace string) *Logger      // sub-logger con espacio de nombres (comparte la configuración raíz)
 l.Clone(trace ...string) *Logger  // copiar (sin args) o agregar trace
 ```
+
+`WithCompress(true)` empaqueta cada día cerrado anterior a 7 días naturales (hoy incluido) en un único `<name>.<YYYY-MM-DD>-<hhmmss>.tar.gz`, donde la fecha es el día archivado y la hora el momento en que se ejecutó la limpieza. Está desactivado por defecto, solo actúa cuando `maxage > 7`, y la limpieza se dispara en la primera escritura que cruza el día. La retención elimina copias y archivos por día natural completo, así que un fichero puede durar hasta un día más que `maxage`, pero nunca se borra antes.
 
 ### Espacio de Nombres / sub-Logger
 
@@ -214,12 +225,35 @@ fl.Caller(b bool)                // control de llamante por entrada
 // Congelar en un *Logger reutilizable
 fl.Group() *Logger                    // persistir cadena de campos (sin liberación manual)
 
-// Métodos terminales (fielder se recicla después de la llamada)
+// Métodos terminales — un fielder emite una vez y luego se recicla
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
 fl.Info(args ...any)    fl.Infof(format string, args ...any)
 fl.Warn(args ...any)    fl.Warnf(format string, args ...any)
 fl.Error(args ...any)   fl.Errorf(format string, args ...any)
 ```
+
+#### Un fielder, una línea
+
+Un `*fielder` es un constructor de un solo uso: la primera llamada terminal (`Info`, `Errorf`, `Group`, …) lo devuelve al pool. Emite una sola vez por fielder — una segunda emisión lo libera de nuevo y puede corromper el pool compartido. Llama a `With()` por línea, o a `Group()` una vez para reutilizar los campos.
+
+```go
+// ❌ fl ya se recicló en la primera llamada; la segunda línea pierde req=id
+fl := logs.With().Str("req", id)
+fl.Info("begin")
+fl.Info("end")
+
+// ✅ un fielder nuevo por línea
+logs.With().Str("req", id).Info("begin")
+logs.With().Str("req", id).Info("end")
+
+// ✅ ¿los mismos campos en varias líneas? congélalos en un *Logger
+base := logs.With().Str("req", id).Group()
+base.Info("begin")
+base.Info("end")
+base.With().Int("step", 2).Info("step")
+```
+
+`Group()` también es terminal: usa el `*Logger` devuelto, no el fielder original.
 
 ### Traza Distribuida
 
