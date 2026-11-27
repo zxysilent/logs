@@ -3,3 +3,4 @@ logs/*
 cover.out
 cover.html
 docs/*
+testdata/
