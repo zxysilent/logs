@@ -126,6 +126,7 @@ SetConsole(true)  SetTrace("trace-id")  Close()
 ### File Options
 ```go
 NewFile(path, WithMaxAge(days), WithMaxSize(MiB), WithConsole(bool))
+NewFile(path, WithMaxAge(64), WithCompress(true))  // per-day tar.gz for days older than 7
 ```
 
 ## Defaults to Know

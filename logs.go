@@ -71,9 +71,9 @@ func SetConsole(b bool) {
 	l.cfg.setConsole(b)
 }
 
-// SetCompress sets whether to archive rotated backups older than the
-// compress threshold (min(7, max(1, maxage/2)) days) into per-day
-// tar.gz files. Only takes effect when a file writer is active (SetFile).
+// SetCompress sets whether to pack each closed day older than 7 calendar days
+// (today included) into one <name>.<YYYY-MM-DD>-<hhmmss>.tar.gz. Only takes
+// effect when a file writer is active (SetFile) and maxage is greater than 7.
 func SetCompress(b bool) {
 	l.cfg.setCompress(b)
 }

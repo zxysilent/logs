@@ -59,7 +59,7 @@ func main() {
     // Custom instances have correct caller skip; add WithSkip(1) if wrapped in a helper
     w, closeFn := logs.NewFile(
         "./logs/app.log",
-        logs.WithMaxAge(7), logs.WithMaxSize(64),
+        logs.WithMaxAge(64), logs.WithMaxSize(64),
         logs.WithConsole(true), logs.WithCompress(true),
     )
     defer closeFn()
@@ -167,7 +167,7 @@ _ = helper // caller(file:line) points to the caller of helper("msg")
 // File output: NewFile returns the Writer + a close handle; compression is opt-in
 w, closeFn := logs.NewFile(
     "app.log",
-    logs.WithMaxAge(7), logs.WithMaxSize(64),
+    logs.WithMaxAge(64), logs.WithMaxSize(64),
     logs.WithConsole(true), logs.WithCompress(true),
 )
 defer closeFn()
@@ -180,7 +180,7 @@ l.Trace(trace string) *Logger      // namespaced sub-logger (shares root config)
 l.Clone(trace ...string) *Logger  // copy (no args) or append trace
 ```
 
-`WithCompress(true)` archives backups older than `min(7, max(1, maxage/2))` days into per-day `.tar.gz` files. Archiving is disabled by default and the background sweep runs on the next day-crossing write.
+`WithCompress(true)` packs each closed day older than 7 calendar days (today included) into one `<name>.<YYYY-MM-DD>-<hhmmss>.tar.gz`, the date being the archived day and the time of day the moment the sweep ran. It is off by default, only kicks in when `maxage > 7`, and the sweep runs on the next day-crossing write. Retention drops backups and archives by whole calendar day, so a file can linger up to one day past `maxage` but is never removed early.
 
 ### Namespace / sub-Logger
 

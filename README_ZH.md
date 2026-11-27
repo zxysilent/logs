@@ -59,7 +59,7 @@ func main() {
     // 自定义实例 caller skip 已自动对齐，若封装在辅助函数中需加 WithSkip(1)
     w, closeFn := logs.NewFile(
         "./logs/app.log",
-        logs.WithMaxAge(7), logs.WithMaxSize(64),
+        logs.WithMaxAge(64), logs.WithMaxSize(64),
         logs.WithConsole(true), logs.WithCompress(true),
     )
     defer closeFn()
@@ -166,7 +166,7 @@ _ = helper // 调用 helper("msg") 时 caller 指向 helper 的调用者
 // 文件输出：NewFile 返回 Writer + 关闭句柄；压缩需显式开启
 w, closeFn := logs.NewFile(
     "app.log",
-    logs.WithMaxAge(7), logs.WithMaxSize(64),
+    logs.WithMaxAge(64), logs.WithMaxSize(64),
     logs.WithConsole(true), logs.WithCompress(true),
 )
 defer closeFn()
@@ -179,7 +179,7 @@ l.Trace(trace string) *Logger      // 命名空间子 Logger（共享根配置�
 l.Clone(trace ...string) *Logger // 纯复制（无参）或追加 trace（有参），共享根配置
 ```
 
-`WithCompress(true)` 会将超过 `min(7, max(1, maxage/2))` 天的备份按天打包为 `.tar.gz`。该功能默认关闭，后台清理/归档会在下一次跨日写入时触发。
+`WithCompress(true)` 会把超过 7 个日历天（含今天）的每一天各打包成一个 `<name>.<YYYY-MM-DD>-<hhmmss>.tar.gz`：日期是被归档的那一天，时分秒是本次归档执行时刻。该功能默认关闭，仅在 `maxage > 7` 时生效，后台清理/归档会在下一次跨日写入时触发。保留期按自然日判定，备份与归档可能比 `maxage` 多留最多一天，但绝不会被提前删除。
 
 ### 命名空间 / 子 Logger
 
@@ -322,4 +322,3 @@ BenchmarkParallelFile     309 ns/op,   0 B/op, 0 allocs   // 并行写入文件
 ## 灵感来源
 
 [zerolog](https://github.com/rs/zerolog/)
-
