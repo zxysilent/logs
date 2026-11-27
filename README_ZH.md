@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+需要 Go 1.24 或更高版本。
+
 ## 特性
 
 - **四级日志**：`DEBUG` `INFO` `WARN` `ERROR`（数值对齐 `log/slog`：-4/0/4/8）
@@ -224,12 +226,37 @@ fl.Caller(b bool)                // 每条单独控制 caller
 // 固化为可复用的 *Logger
 fl.Group() *Logger                    // 持久化字段链（无需手动释放）
 
-// 终端方法（调用后 fielder 被回收）
+// 终端方法（一个 fielder 只输出一次，之后即被回收）
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
 fl.Info(args ...any)    fl.Infof(format string, args ...any)
 fl.Warn(args ...any)    fl.Warnf(format string, args ...any)
 fl.Error(args ...any)   fl.Errorf(format string, args ...any)
 ```
+
+#### 一个 fielder 只能输出一次
+
+`*fielder` 是池化的一次性构建器：第一次调用终结方法（`Info`、`Errorf`、`Group` 等）
+就会把它归还池中。一个 fielder 只能输出一次，二次输出会重复归还并可能破坏内部池。
+每行调用一次 `With()`，或先用 `Group()` 固化字段。
+
+```go
+// ❌ fl 在第一次调用后已被回收，第二行没有 req=id
+fl := logs.With().Str("req", id)
+fl.Info("begin")
+fl.Info("end")
+
+// ✅ 每行都新建一个 fielder
+logs.With().Str("req", id).Info("begin")
+logs.With().Str("req", id).Info("end")
+
+// ✅ 同一组字段要多行输出，用 Group 固化成 *Logger
+base := logs.With().Str("req", id).Group()
+base.Info("begin")
+base.Info("end")
+base.With().Int("step", 2).Info("step")
+```
+
+`Group()` 同样是终结方法：之后请使用返回的 `*Logger`，而不是原 fielder。
 
 ### 链路追踪
 
@@ -325,4 +352,3 @@ BenchmarkParallelFile     309 ns/op,   0 B/op, 0 allocs   // 并行写入文件
 ## 灵感来源
 
 [zerolog](https://github.com/rs/zerolog/)
-

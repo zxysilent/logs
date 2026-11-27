@@ -71,6 +71,9 @@ base.Info("started")
 base.With().Int("step", 1).Info("processing")
 ```
 
+A fielder is single-use: the first terminal call (`Info`/`Errorf`/`Group`) recycles it,
+and emitting twice re-releases it. Call `With()` per line, or `Group()` once to reuse.
+
 ### Field Types
 ```go
 Str(key, val)  Bool(key, val)  Err(err)  IfErr(err)  
