@@ -20,6 +20,7 @@ const (
 	sizeMiB       = 1024 * 1024
 	defMaxage     = 64 // days
 	defMaxsize    = 64 // MiB
+	keepDays      = 7  // full days that stay uncompressed; older days get archived
 	archiveSuffix = ".tar.gz"
 )
 
@@ -200,29 +201,16 @@ func (w *Writer) sweep() {
 	w.delete(maxage)
 }
 
-// compressDays returns how many recent days stay uncompressed:
-// min(7, max(1, maxage/2)). Today and yesterday are always kept as plain
-// files regardless of the threshold.
-func (w *Writer) compressDays() int {
-	d := w.maxage / 2
-	if d < 1 {
-		d = 1
-	}
-	if d > 7 {
-		d = 7
-	}
-	return d
-}
-
 // archive groups rotated backups by day and archives every full day older
-// than the compress threshold into <fname>.<YYYY-MM-DD>.tar.gz. Entries keep
-// the original backup filenames so archives extract to greppable .log files.
-// Archiving is atomic (temp file + rename) and idempotent (existing archives
-// are skipped); sources are removed only after a successful archive.
+// than keepDays into <fname>.<YYYY-MM-DD>.tar.gz. Entries keep the original
+// backup filenames so archives extract to greppable .log files. With
+// maxage < keepDays, retention removes files before they reach the window,
+// so archiving is naturally a no-op. Archiving is atomic (temp file +
+// rename) and idempotent (existing archives are skipped); sources are
+// removed only after a successful archive.
 func (w *Writer) archive() {
-	keep := w.compressDays()
 	now := time.Now().In(w.loc)
-	limit := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -keep)
+	limit := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -keepDays)
 
 	dirs, err := os.ReadDir(w.fdir)
 	if err != nil {

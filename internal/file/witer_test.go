@@ -278,7 +278,7 @@ func TestCompressByDay(t *testing.T) {
 	w := New(filepath.Join(dir, "app.log"))
 	w.SetConsole(false)
 	defer w.Close()
-	w.SetMaxAge(64) // keep = min(7, 32) = 7
+	w.SetMaxAge(64) // retention far beyond keepDays; days-9 compresses, day-7 stays
 
 	today := time.Now()
 	nameOld1 := createBackup(t, dir, "app", "day-nine file one", today.AddDate(0, 0, -9))
@@ -337,26 +337,39 @@ func TestCompressIdempotent(t *testing.T) {
 	}
 }
 
-// TestCompressThreshold verifies maxage halves drive the threshold:
-// maxage=4 -> keep=2 -> a 3-days-old backup is compressed.
-func TestCompressThreshold(t *testing.T) {
+// TestCompressShortRetention verifies that with maxage < keepDays nothing is
+// archived: retention deletes old backups before they reach the 7-day window.
+func TestCompressShortRetention(t *testing.T) {
 	dir := t.TempDir()
 	w := New(filepath.Join(dir, "app.log"))
 	w.SetConsole(false)
 	defer w.Close()
 	w.SetMaxAge(4)
-	if got := w.compressDays(); got != 2 {
-		t.Fatalf("compressDays = %d, want 2", got)
-	}
 
 	today := time.Now()
-	nameOld := createBackup(t, dir, "app", "three days old", today.AddDate(0, 0, -3))
+	nameStale := createBackup(t, dir, "app", "five days old", today.AddDate(0, 0, -5))
+	nameInWindow := createBackup(t, dir, "app", "three days old", today.AddDate(0, 0, -3))
 	nameKept := createBackup(t, dir, "app", "two days old", today.AddDate(0, 0, -2))
 	w.compress = true // set directly; SetCompress only toggles the flag
 	w.sweep()
 
-	if _, err := os.Stat(filepath.Join(dir, nameOld)); !os.IsNotExist(err) {
-		t.Fatalf("3-days-old file should be compressed, err=%v", err)
+	// No archive of any kind should exist.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir failed: %v", err)
+	}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), archiveSuffix) {
+			t.Fatalf("no archive expected with maxage < keepDays, found: %s", e.Name())
+		}
+	}
+	// The 5-days-old backup is removed by retention, not compression.
+	if _, err := os.Stat(filepath.Join(dir, nameStale)); !os.IsNotExist(err) {
+		t.Fatalf("5-days-old file should be removed by retention, err=%v", err)
+	}
+	// Backups inside the uncompressed window stay as plain files.
+	if _, err := os.Stat(filepath.Join(dir, nameInWindow)); err != nil {
+		t.Fatalf("3-days-old file should stay plain: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, nameKept)); err != nil {
 		t.Fatalf("2-days-old file should stay plain: %v", err)
@@ -371,11 +384,11 @@ func TestCompressUsesLocalDateBoundary(t *testing.T) {
 	w.loc = location
 	w.SetConsole(false)
 	defer w.Close()
-	w.SetMaxAge(4)
+	w.SetMaxAge(64)
 	w.SetCompress(true)
 
 	today := time.Now().In(location)
-	boundary := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -2)
+	boundary := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -keepDays)
 	older := boundary.AddDate(0, 0, -1)
 	nameBoundary := createBackup(t, dir, "app", "boundary day", boundary)
 	nameOlder := createBackup(t, dir, "app", "older day", older)
