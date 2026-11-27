@@ -1,6 +1,10 @@
 package logs
 
-// fielder is a one-time chain builder for accumulating fields.
+// fielder 是一次性构建器：任意终结方法（Info/Error/Group 等）都会把它归还池中，
+// 同一个 fielder 只能 emit 一次，再次使用属于误用；复用字段请用 Group。
+//
+// fielder is a single-use builder: every terminal call returns it to the pool, so
+// emit exactly once per value. Reusing one is a bug; use Group to reuse fields.
 type fielder struct {
 	attr   *buffer //调用输出后清空
 	cfg    *config
@@ -9,8 +13,8 @@ type fielder struct {
 	skip   bool
 }
 
-// Group 将当前 fielder 攒好的字段固化为持久、可复用的 *Logger。调用后原 fielder 被释放，不可再使用。
-// Group solidifies the accumulated fields into a persistent *Logger. The original fielder is released and must not be used again.
+// Group 把字段固化为可复用、并发安全的 *Logger，并回收 fielder。
+// Group freezes the fields into a reusable *Logger and recycles the fielder.
 func (s *fielder) Group() *Logger {
 	c := &Logger{cfg: s.cfg, trace: s.trace}
 	if s.attr != nil && len(*s.attr) > 0 {

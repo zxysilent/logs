@@ -221,12 +221,15 @@ func putb(b *buffer) {
 // fpool reuses fielder values to avoid per-call allocation.
 var fpool = sync.Pool{New: func() any { return &fielder{} }}
 
-// getfl gets a pooled fielder.
+// getfl gets a pooled fielder. The caller owns it until exactly one terminal
+// call (Info/Error/Group/...) puts it back.
 func getfl() *fielder {
 	return fpool.Get().(*fielder)
 }
 
-// putfl resets and returns a fielder to the pool.
+// putfl resets and returns a fielder to the pool. Each fielder must be released
+// exactly once: releasing twice enqueues the same object twice, and two
+// goroutines can then hold it at the same time.
 func putfl(fl *fielder) {
 	if fl == nil {
 		return
