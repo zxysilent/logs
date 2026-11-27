@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, v0.11.x]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, v0.11.x]
 
 jobs:
   test:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.20', '1.21', '1.22', '1.23', '1.24']
+        go-version: ['1.20', '1.22', '1.24', '1.26']
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +30,28 @@ jobs:
       - name: Coverage (text)
         run: go tool cover -func=cover.out
 
+  fuzz:
+    name: Fuzz (short)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Fuzz file writer
+        run: |
+          for target in FuzzPasename FuzzDeleteRetention FuzzWriteRotate FuzzArchiveNoDataLoss; do
+            go test ./internal/file/ -run "^$target\$" -fuzz "^$target\$" -fuzztime=20s
+          done
+
+      - name: Fuzz logger
+        run: |
+          for target in FuzzInfo FuzzInfof FuzzPrintb FuzzNsInfo; do
+            go test . -run "^$target\$" -fuzz "^$target\$" -fuzztime=15s
+          done
+
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
@@ -38,7 +60,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
 
       - name: Benchmark
         run: go test -run=NONE -bench=. -benchmem -count=3 ./...

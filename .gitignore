@@ -2,3 +2,5 @@ logs/*
 *.prof
 cover.out
 cover.html
+
+testdata/
