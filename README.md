@@ -2,6 +2,8 @@
 
 [中文文档](README_ZH.md)
 
+Requires Go 1.20 or newer.
+
 ## Features
 
 - **Four log levels**: `DEBUG` `INFO` `WARN` `ERROR`
@@ -222,12 +224,38 @@ fl.Caller(b bool)                // per-entry caller control
 // Freeze into a reusable *Logger
 fl.Group() *Logger                    // persist field chain (no manual release)
 
-// Terminal methods (fielder is recycled after call)
+// Terminal methods — a fielder emits once, then it is recycled
 fl.Debug(args ...any)   fl.Debugf(format string, args ...any)
 fl.Info(args ...any)    fl.Infof(format string, args ...any)
 fl.Warn(args ...any)    fl.Warnf(format string, args ...any)
 fl.Error(args ...any)   fl.Errorf(format string, args ...any)
 ```
+
+#### One fielder, one line
+
+A `*fielder` is a pooled, single-use builder: the first terminal call (`Info`,
+`Errorf`, `Group`, …) recycles it. Emit once per fielder — a second emit
+re-releases it and can corrupt the shared pool. Call `With()` per line, or
+`Group()` once to reuse fields.
+
+```go
+// ❌ fl is already recycled by the first call; the second line loses req=id
+fl := logs.With().Str("req", id)
+fl.Info("begin")
+fl.Info("end")
+
+// ✅ build a new fielder per line
+logs.With().Str("req", id).Info("begin")
+logs.With().Str("req", id).Info("end")
+
+// ✅ same fields on many lines? freeze them into a *Logger
+base := logs.With().Str("req", id).Group()
+base.Info("begin")
+base.Info("end")
+base.With().Int("step", 2).Info("step")
+```
+
+`Group()` is terminal too: use the returned `*Logger`, not the original fielder.
 
 ### Distributed Tracing
 
