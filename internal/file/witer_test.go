@@ -25,7 +25,7 @@ func newTestWriter(t *testing.T, dir string, at time.Time) *Writer {
 	w.SetConsole(false)
 	w.loc = at.Location()
 	setNow(w, at)
-	t.Cleanup(func() { w.Close() })
+	t.Cleanup(func() { _ = w.Close() })
 	return w
 }
 
@@ -121,15 +121,6 @@ func TestPasenameRejectsMalformedNames(t *testing.T) {
 	}
 }
 
-func TestReadDir(t *testing.T) {
-	dirs, err := os.ReadDir("../../logs")
-	if err != nil {
-		return
-	}
-	for _, dir := range dirs {
-		t.Log(dir.Name())
-	}
-}
 func TestWriterLifecycle(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
@@ -690,9 +681,9 @@ func wantKeyFor(day time.Time) string {
 	return "app" + day.Format(nameLayout) + ".log"
 }
 
-// TestCompressArchivePathBlocked verifies a blocked archive path never costs
-// any log data.
-func TestCompressArchivePathBlocked(t *testing.T) {
+// TestCompressArchivePathOccupied verifies an occupied archive path is treated
+// as already archived: nothing is overwritten and no source is dropped.
+func TestCompressArchivePathOccupied(t *testing.T) {
 	dir := t.TempDir()
 	w := newTestWriter(t, dir, testNow)
 	w.SetMaxAge(64)
@@ -700,14 +691,21 @@ func TestCompressArchivePathBlocked(t *testing.T) {
 
 	day := testNow.AddDate(0, 0, -9)
 	name := createBackup(t, dir, "app", "must survive", day)
-	blocked := filepath.Join(dir, archiveName(day, testNow))
-	if err := os.Mkdir(blocked, 0o755); err != nil {
-		t.Fatalf("create blocking directory failed: %v", err)
+	occupied := filepath.Join(dir, archiveName(day, testNow))
+	if err := os.WriteFile(occupied, []byte("existing archive"), 0o644); err != nil {
+		t.Fatalf("create occupied archive failed: %v", err)
 	}
 
 	w.sweep()
 	if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
-		t.Fatalf("source must survive a blocked archive path: %v", err)
+		t.Fatalf("source must survive when the archive path is occupied: %v", err)
+	}
+	data, err := os.ReadFile(occupied)
+	if err != nil {
+		t.Fatalf("occupied archive disappeared: %v", err)
+	}
+	if string(data) != "existing archive" {
+		t.Fatalf("occupied archive was overwritten: %q", data)
 	}
 }
 

@@ -285,7 +285,7 @@ func (w *Writer) archive() {
 	// Drop temp files left behind for days that are already archived.
 	for day, name := range temps {
 		if _, ok := archived[day]; ok {
-			os.Remove(filepath.Join(w.fdir, name))
+			_ = os.Remove(filepath.Join(w.fdir, name))
 		}
 	}
 	if len(days) == 0 {
@@ -312,7 +312,7 @@ func (w *Writer) archiveday(day, now time.Time, names []string) {
 	stamp := time.Date(day.Year(), day.Month(), day.Day(), now.Hour(), now.Minute(), now.Second(), 0, w.dayof(day).Location())
 	apath := filepath.Join(w.fdir, w.fname+w.time2name(stamp)+archiveSuffix)
 	if _, err := os.Stat(apath); err == nil {
-		os.Remove(w.tmppath(day))
+		_ = os.Remove(w.tmppath(day))
 		return // already archived
 	}
 	tmp := w.tmppath(day)
@@ -439,6 +439,11 @@ func (w *Writer) pasename(name string) (time.Time, nameKind, error) {
 	loc := w.loc
 	if loc == nil {
 		loc = time.Local
+	}
+	// time.Parse also accepts a fractional second that the layout does not
+	// describe, so require the canonical width before parsing.
+	if len(rest) != len(nameLayout) {
+		return time.Time{}, kindBackup, errBadName
 	}
 	t, err := time.ParseInLocation(nameLayout, rest, loc)
 	if err != nil {

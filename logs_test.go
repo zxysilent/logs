@@ -76,7 +76,8 @@ func TestInst(t *testing.T) {
 }
 
 func TestBase(t *testing.T) {
-	l := New(os.Stdout, WithCaller(true), WithLevel(LevelDebug))
+	var buf bytes.Buffer
+	l := New(&buf, WithCaller(true), WithLevel(LevelDebug))
 	l.Debug("Debug")
 	l.Debugf("%s", "Debugf")
 	l.Info("Info")
@@ -85,10 +86,18 @@ func TestBase(t *testing.T) {
 	l.Warnf("%s", "Warnf")
 	l.Error("Error")
 	l.Errorf("%s", "Errorf")
+
+	got := buf.String()
+	for _, want := range []string{"level=DBG", "level=INF", "level=WRN", "level=ERR", "msg=Errorf"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %s", want, got)
+		}
+	}
 }
 
 func TestWithBase(t *testing.T) {
-	l := New(os.Stdout, WithCaller(true))
+	var buf bytes.Buffer
+	l := New(&buf, WithCaller(true), WithLevel(LevelDebug))
 	ctx := TraceCtx(context.TODO())
 	l.Ctx(ctx).Debug("Debug")
 	l.Ctx(ctx).Debugf("%s", "Debugf")
@@ -100,6 +109,14 @@ func TestWithBase(t *testing.T) {
 	l.Ctx(ctx).Errorf("%s", "Errorf")
 	l.Ctx(ctx).If(false).Error("Error")
 	l.Ctx(ctx).If(false).Errorf("%s", "Errorf")
+
+	got := buf.String()
+	if n := strings.Count(got, "\n"); n != 8 {
+		t.Fatalf("expected 8 lines, got %d: %s", n, got)
+	}
+	if !strings.Contains(got, "trace="+TraceOf(ctx)) {
+		t.Fatalf("trace id missing: %s", got)
+	}
 }
 
 // TestConfigFallback verifies nil out + set* methods tolerate nil fw without panic.
@@ -178,11 +195,12 @@ func TestSetSepMulti(t *testing.T) {
 }
 
 func TestConfigWithFile(t *testing.T) {
-	l := New(os.Stdout)
-	l.cfg.setFile("./logs/app.log")
+	l := New(io.Discard)
+	l.cfg.setFile(filepath.Join(t.TempDir(), "app.log"))
+	defer func() { _ = l.cfg.close() }()
 	l.cfg.setCaller(true)
 	l.cfg.setLevel(LevelError)
-	l.cfg.setConsole(true)
+	l.cfg.setConsole(false)
 	l.cfg.setMaxAge(1)
 	l.cfg.setMaxSize(1024)
 	ctx := TraceCtx(context.TODO())
@@ -295,12 +313,12 @@ func readTarGz(t *testing.T, path string) map[string]string {
 	if err != nil {
 		t.Fatalf("open archive failed: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		t.Fatalf("gzip reader failed: %v", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	tr := tar.NewReader(gz)
 	out := map[string]string{}
 	for {
@@ -343,7 +361,7 @@ func (mi mint) String() string {
 }
 
 func TestField(t *testing.T) {
-	n := New(os.Stdout)
+	n := New(io.Discard)
 	f := n.With()
 	f.Bool("out", false).
 		Caller(true).
@@ -374,7 +392,7 @@ func TestField(t *testing.T) {
 
 // TestCtxInfo verifies Ctx + Info/Error basic flow with trace id.
 func TestCtxInfo(t *testing.T) {
-	l := New(os.Stdout, WithCaller(true))
+	l := New(io.Discard, WithCaller(true))
 	ctx := TraceCtx(context.Background(), trace())
 	l.Ctx(ctx).Info()
 	l.Ctx(ctx).Info()
@@ -384,12 +402,13 @@ func TestCtxInfo(t *testing.T) {
 	s := l.Ctx(ctx)
 	s.Bool("b", false)
 	s.Info("666")
-	s.Info("xx")
+	// A fielder is single-use: the emit above released s back to the pool.
+	l.Ctx(ctx).Bool("b", false).Info("xx")
 }
 
 // TestGroupBasic verifies Group then Debug/Info/Error work.
 func TestGroupBasic(t *testing.T) {
-	l := New(os.Stdout, WithCaller(true))
+	l := New(io.Discard, WithCaller(true))
 	defer l.cfg.close()
 	ctx := TraceCtx(context.Background(), trace())
 	l1 := l.Ctx(ctx).Str("basic", "basic").Group()
@@ -399,11 +418,27 @@ func TestGroupBasic(t *testing.T) {
 	s := l.Ctx(ctx)
 	s.Bool("b", false)
 	s.Info("666")
-	s.Info("xx")
+	// A fielder is single-use: the emit above released s back to the pool.
+	l.Ctx(ctx).Bool("b", false).Info("xx")
 }
+
+// restoreDefault snapshots the package-level logger config and restores it when
+// the test ends, so reconfiguring the default instance cannot leak into the
+// next test.
+func restoreDefault(t *testing.T) {
+	t.Helper()
+	prev := *l.cfg
+	t.Cleanup(func() {
+		_ = l.cfg.close()
+		*l.cfg = prev
+	})
+}
+
 func TestWriter(t *testing.T) {
-	SetFile("./logs/app.log")
-	SetConsole(true)
+	restoreDefault(t)
+	path := filepath.Join(t.TempDir(), "app.log")
+	SetFile(path)
+	SetConsole(false)
 	SetCaller(true)
 	for i := 0; i < 10; i++ {
 		With().Int("idx", i).Debug()
@@ -420,18 +455,38 @@ func TestWriter(t *testing.T) {
 		With().Int("idx", i).Errorf("errorf")
 	}
 	With().Str("idx", "sp ce").Errorf("omit empty")
-	Close()
+	if err := Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("log file missing: %v", err)
+	}
+	if !strings.Contains(string(data), "level=ERR") || !strings.Contains(string(data), "idx=9") {
+		t.Fatalf("log file lacks expected entries (%d bytes)", len(data))
+	}
 }
 
 // TestGroupFromCtx verifies Ctx + Group + With combination.
 func TestGroupFromCtx(t *testing.T) {
-	SetFile("./logs/app.log")
-	SetConsole(true)
-	SetCaller(true)
-	ctx := TraceCtx(context.Background())
+	var buf bytes.Buffer
+	restoreDefault(t)
+	SetOutput(&buf)
+	SetCaller(false)
+	ctx := TraceCtx(context.Background(), "root")
 	n := Ctx(ctx).Str("A", "B").Str("subtrace", "sub").Group()
 	n.With().Str("b", "b").Info("xx")
 	n.With().Str("c", "c").Info("xx")
+
+	got := buf.String()
+	if strings.Count(got, "\n") != 2 {
+		t.Fatalf("expected 2 lines, got %d: %s", strings.Count(got, "\n"), got)
+	}
+	for _, want := range []string{"A=B", "subtrace=sub", "b=b", "c=c"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q: %s", want, got)
+		}
+	}
 }
 
 // TestCallerCorrect verifies caller points to the actual call site, not internal helper.
@@ -1174,6 +1229,31 @@ func TestPutflNil(t *testing.T) {
 	putfl(nil) // nil branch
 }
 
+// TestFielderPoolStaysClean verifies the documented single-use contract holds on
+// the library's own paths: no fielder is enqueued twice, so the pool never hands
+// the same object to two owners.
+func TestFielderPoolStaysClean(t *testing.T) {
+	l := New(io.Discard, WithCaller(false))
+	for i := 0; i < 4; i++ {
+		l.With().Int("n", i).Info("x")
+		l.With().Str("s", "v").Group().Info("y")
+	}
+
+	seen := make(map[*fielder]bool, 8)
+	held := make([]*fielder, 0, 8)
+	for i := 0; i < 8; i++ {
+		fl := getfl()
+		if seen[fl] {
+			t.Fatalf("pool handed out the same fielder twice")
+		}
+		seen[fl] = true
+		held = append(held, fl)
+	}
+	for _, fl := range held {
+		putfl(fl)
+	}
+}
+
 // TestPrintbCallerRuntimeFail covers the printb !ok branch (file="###") via stdWriter.
 func TestPrintbCallerRuntimeFail(t *testing.T) {
 	var buf bytes.Buffer
@@ -1247,13 +1327,14 @@ func TestPrintfCallerRuntimeFail(t *testing.T) {
 
 // TestPackageClose verifies package-level Close succeeds.
 func TestPackageClose(t *testing.T) {
-	// Don't actually close the package logger; test with discard only.
-	prevOut := l.cfg.out
+	restoreDefault(t)
 	SetOutput(io.Discard)
-	defer SetOutput(prevOut)
 
-	if err := Close(); err == nil {
-		// Success
+	if err := Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	if err := Close(); err != nil {
+		t.Fatalf("second Close should be a no-op, got %v", err)
 	}
 }
 

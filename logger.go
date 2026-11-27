@@ -144,8 +144,10 @@ func (l *Logger) Clone(trace ...string) *Logger {
 	return c
 }
 
-// With 创建一个一次性 fielder，用于攒字段后通过 Group 固化为持久 Logger。
-// With creates a one-time fielder for accumulating fields and then solidifying them into a persistent Logger via Group.
+// With 派生一次性 fielder：emit 一次后自动归还池中，二次调用安全但字段已清空；
+// 需要在多行复用字段请用 Group。
+// With derives a one-time fielder recycled after one emit; a second emit is safe
+// but carries no fields. Use Group to reuse the fields.
 func (l *Logger) With(trace ...string) *fielder {
 	f := getfl()
 	f.cfg = l.cfg
@@ -160,8 +162,8 @@ func (l *Logger) With(trace ...string) *fielder {
 	return f
 }
 
-// Ctx 从 context 取出 traceid，与命名空间拼接后派生一次性 fielder。
-// Ctx extracts traceid from context, joins it with the namespace, and derives a one-time fielder.
+// Ctx 同 With，只是 traceid 取自 context。
+// Ctx is With with the trace id taken from the context.
 func (l *Logger) Ctx(ctx context.Context) *fielder {
 	f := getfl()
 	f.cfg = l.cfg

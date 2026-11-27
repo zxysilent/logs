@@ -160,12 +160,12 @@ func Println(args ...any) {
 	}
 }
 
-// With is the field logging entry.
+// With is the field logging entry; the fielder emits once (see Logger.With).
 func With(trace ...string) *fielder {
 	return l.With(trace...)
 }
 
-// Ctx is the context logging entry.
+// Ctx is the context logging entry (see Logger.Ctx).
 func Ctx(ctx context.Context) *fielder {
 	return l.Ctx(ctx)
 }
