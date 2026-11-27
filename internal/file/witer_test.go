@@ -7,42 +7,117 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-func TestName2time(t *testing.T) {
-	f := New("../../logs/app.log")
-	f.console = false
-	t.Logf("%+v", f)
-	f.delete(f.maxage)
+// testLoc and testNow pin the clock so day boundaries stay deterministic.
+var (
+	testLoc = time.FixedZone("CST", 8*60*60)
+	testNow = time.Date(2026, 3, 15, 10, 0, 0, 0, testLoc)
+)
+
+// newTestWriter returns a writer over dir/app.log with a frozen clock.
+func newTestWriter(t *testing.T, dir string, at time.Time) *Writer {
+	t.Helper()
+	w := New(filepath.Join(dir, "app.log"))
+	w.SetConsole(false)
+	w.loc = at.Location()
+	setNow(w, at)
+	t.Cleanup(func() { w.Close() })
+	return w
 }
 
-func TestArchive2timeRejectsMalformedNames(t *testing.T) {
-	w := &Writer{fname: "app", loc: time.UTC}
-	for _, name := range []string{
-		"app.tar.gz",
-		"appx.2024-01-02.tar.gz",
-		"app.2024-13-02.tar.gz",
-		"app.2024-01-02x.tar.gz",
-	} {
-		if _, err := w.archive2time(name); err == nil {
-			t.Errorf("archive2time(%q) expected an error", name)
+// setNow moves the writer's frozen clock.
+func setNow(w *Writer, at time.Time) {
+	ts := at
+	w.now = func() time.Time { return ts }
+}
+
+// archiveName is the archive file a sweep at `at` produces for `day`.
+func archiveName(day, at time.Time) string {
+	stamp := time.Date(day.Year(), day.Month(), day.Day(), at.Hour(), at.Minute(), at.Second(), 0, day.Location())
+	return "app" + stamp.Format(nameLayout) + archiveSuffix
+}
+
+// dirNames lists the file names in dir.
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir %s failed: %v", dir, err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// countArchives counts tar.gz files in dir.
+func countArchives(t *testing.T, dir string) int {
+	t.Helper()
+	n := 0
+	for _, name := range dirNames(t, dir) {
+		if strings.HasSuffix(name, archiveSuffix) {
+			n++
+		}
+	}
+	return n
+}
+
+// TestPasename verifies one parser covers backups and archives, differing only
+// by suffix.
+func TestPasename(t *testing.T) {
+	w := &Writer{fname: "app", fsuffix: ".log", loc: testLoc}
+	cases := []struct {
+		name string
+		kind nameKind
+		want time.Time
+	}{
+		{"app.2026-01-02-030405.log", kindBackup, time.Date(2026, 1, 2, 3, 4, 5, 0, testLoc)},
+		{"app.2026-01-02-100530.tar.gz", kindArchive, time.Date(2026, 1, 2, 10, 5, 30, 0, testLoc)},
+	}
+	for _, c := range cases {
+		got, kind, err := w.pasename(c.name)
+		if err != nil {
+			t.Fatalf("pasename(%q) failed: %v", c.name, err)
+		}
+		if kind != c.kind {
+			t.Errorf("pasename(%q) kind = %v, want %v", c.name, kind, c.kind)
+		}
+		if !got.Equal(c.want) {
+			t.Errorf("pasename(%q) = %v, want %v", c.name, got, c.want)
 		}
 	}
 }
 
-func TestName2timeRejectsMalformedNames(t *testing.T) {
-	w := &Writer{fname: "app", fsuffix: ".log", loc: time.UTC}
+// TestPasenameRejectsMalformedNames verifies unmanaged files are ignored
+// instead of being archived or deleted.
+func TestPasenameRejectsMalformedNames(t *testing.T) {
+	w := &Writer{fname: "app", fsuffix: ".log", loc: testLoc}
 	for _, name := range []string{
 		"app.log",
-		"appx.2024-01-02-030405.log",
-		"app.2024-13-02-030405.log",
-		"app.2024-01-02-030405.txt",
+		"app.tar.gz",
+		"appx.2026-01-02-030405.log",
+		"app.2026-13-02-030405.log",
+		"app.2026-1-2-030405.log",
+		"app.2026-01-02-030405.txt",
+		"app.2026-01-02-030405.log.tmp",
+		"app.2026-01-02-030405.tar.gz.tmp",
+		"app.2026-01-02x-030405.log",
 	} {
-		if _, err := w.name2time(name); err == nil {
-			t.Errorf("name2time(%q) expected an error", name)
+		if _, _, err := w.pasename(name); err == nil {
+			t.Errorf("pasename(%q) expected an error", name)
 		}
+	}
+	// The backup name is only valid while its suffix matches the writer.
+	if _, _, err := w.pasename("app.2026-01-02-030405.log"); err != nil {
+		t.Errorf("valid backup rejected: %v", err)
+	}
+	if _, _, err := (&Writer{fname: "app", fsuffix: ".txt", loc: testLoc}).pasename("app.2026-01-02-030405.log"); err == nil {
+		t.Errorf("backup with foreign suffix should be rejected")
 	}
 }
 
@@ -254,42 +329,42 @@ func readArchive(t *testing.T, path string) map[string]string {
 // TestCompressDisabled verifies no archives are created when compress is off.
 func TestCompressDisabled(t *testing.T) {
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
+	w := newTestWriter(t, dir, testNow)
 	w.SetMaxAge(64)
 
-	old := time.Now().AddDate(0, 0, -9)
-	createBackup(t, dir, "app", "old data", old)
+	old := createBackup(t, dir, "app", "old data", testNow.AddDate(0, 0, -9))
 	w.sweep()
 
-	entries, _ := os.ReadDir(dir)
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), archiveSuffix) {
-			t.Fatalf("archive created while compress disabled: %s", e.Name())
-		}
+	if n := countArchives(t, dir); n != 0 {
+		t.Fatalf("archives created while compress disabled: %d", n)
+	}
+	if _, err := os.Stat(filepath.Join(dir, old)); err != nil {
+		t.Fatalf("backup should stay plain when compress is off: %v", err)
 	}
 }
 
-// TestCompressByDay verifies per-day archiving, original entry names,
-// source removal, and the uncompressed window.
+// TestCompressByDay verifies per-day archiving, the derived archive name,
+// original entry names, source removal, and the uncompressed window.
 func TestCompressByDay(t *testing.T) {
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
-	w.SetMaxAge(64) // retention far beyond keepDays; days-9 compresses, day-7 stays
+	w := newTestWriter(t, dir, testNow) // 2026-03-15 10:00:00
+	w.SetMaxAge(64)
+	w.SetCompress(true)
 
-	today := time.Now()
-	nameOld1 := createBackup(t, dir, "app", "day-nine file one", today.AddDate(0, 0, -9))
-	nameOld2 := createBackup(t, dir, "app", "day-nine file two", today.AddDate(0, 0, -9).Add(time.Hour))
-	nameKept1 := createBackup(t, dir, "app", "day-two kept", today.AddDate(0, 0, -2))
-	nameKept2 := createBackup(t, dir, "app", "today kept", today)
-	nameRecent := createBackup(t, dir, "app", "seven-days-ago kept", today.AddDate(0, 0, -7))
+	oldDay := testNow.AddDate(0, 0, -9)
+	edgeDay := testNow.AddDate(0, 0, -7)
+	nameOld1 := createBackup(t, dir, "app", "day-nine file one", oldDay)
+	nameOld2 := createBackup(t, dir, "app", "day-nine file two", oldDay.Add(time.Hour))
+	nameKept1 := createBackup(t, dir, "app", "six days kept", testNow.AddDate(0, 0, -6))
+	nameKept2 := createBackup(t, dir, "app", "today kept", testNow)
+	nameEdge := createBackup(t, dir, "app", "seven days archived", edgeDay)
 
-	w.compress = true // set directly; SetCompress only toggles the flag
 	w.sweep()
-	archive := filepath.Join(dir, "app."+today.AddDate(0, 0, -9).Format("2006-01-02")+".tar.gz")
+
+	archive := filepath.Join(dir, archiveName(oldDay, testNow))
+	if want := "app.2026-03-06-100000.tar.gz"; filepath.Base(archive) != want {
+		t.Fatalf("archive name = %s, want %s", filepath.Base(archive), want)
+	}
 	if _, err := os.Stat(archive); err != nil {
 		t.Fatalf("archive missing after sweep: %v", err)
 	}
@@ -302,179 +377,396 @@ func TestCompressByDay(t *testing.T) {
 		t.Fatalf("archive entries mismatch: %v", got)
 	}
 
-	// sources of archived day removed
-	if _, err := os.Stat(filepath.Join(dir, nameOld1)); !os.IsNotExist(err) {
-		t.Fatalf("archived source should be removed, err=%v", err)
+	// Day -7 is the first day outside the uncompressed window.
+	edgeArchive := filepath.Join(dir, archiveName(edgeDay, testNow))
+	if _, err := os.Stat(edgeArchive); err != nil {
+		t.Fatalf("day-7 backup should be archived: %v", err)
+	}
+	if got := readArchive(t, edgeArchive); got[nameEdge] != "seven days archived" {
+		t.Fatalf("day-7 archive content mismatch: %v", got)
+	}
+
+	// sources of archived days removed
+	for _, removed := range []string{nameOld1, nameOld2, nameEdge} {
+		if _, err := os.Stat(filepath.Join(dir, removed)); !os.IsNotExist(err) {
+			t.Fatalf("archived source %s should be removed, err=%v", removed, err)
+		}
 	}
 	// window files untouched
-	for _, kept := range []string{nameKept1, nameKept2, nameRecent} {
+	for _, kept := range []string{nameKept1, nameKept2} {
 		if _, err := os.Stat(filepath.Join(dir, kept)); err != nil {
 			t.Fatalf("in-window file %s should be kept: %v", kept, err)
 		}
 	}
+	if n := countArchives(t, dir); n != 2 {
+		t.Fatalf("archives created = %d, want 2", n)
+	}
 }
 
-// TestCompressIdempotent verifies repeated sweeps do not duplicate archives.
+// TestCompressIdempotent verifies repeated sweeps, including ones running at a
+// different time of day, never produce a second archive for a day.
 func TestCompressIdempotent(t *testing.T) {
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
+	w := newTestWriter(t, dir, testNow)
 	w.SetMaxAge(64)
+	w.SetCompress(true)
 
-	today := time.Now()
-	createBackup(t, dir, "app", "old data", today.AddDate(0, 0, -9))
-	w.compress = true // set directly; SetCompress only toggles the flag
+	oldDay := testNow.AddDate(0, 0, -9)
+	createBackup(t, dir, "app", "old data", oldDay)
 
-	archive := filepath.Join(dir, "app."+today.AddDate(0, 0, -9).Format("2006-01-02")+".tar.gz")
+	archive := filepath.Join(dir, archiveName(oldDay, testNow))
 	for i := 0; i < 3; i++ {
 		w.sweep()
 	}
 	got := readArchive(t, archive)
-	wantKey := "app" + today.AddDate(0, 0, -9).Format(".2006-01-02-150405") + ".log"
+	wantKey := "app" + oldDay.Format(nameLayout) + ".log"
 	if len(got) != 1 || got[wantKey] != "old data" {
 		t.Fatalf("archive content corrupted by repeated sweep: want key %#v, got %#v", wantKey, got)
 	}
+
+	// A later sweep at a different time of day must not add a second archive.
+	setNow(w, testNow.Add(90*time.Minute+15*time.Second))
+	w.sweep()
+	if n := countArchives(t, dir); n != 1 {
+		t.Fatalf("archives after clock moved = %d, want 1: %v", n, dirNames(t, dir))
+	}
+	if _, err := os.Stat(filepath.Join(dir, "app.2026-03-06-113015.tar.gz")); !os.IsNotExist(err) {
+		t.Fatalf("second archive for the same day should not exist, err=%v", err)
+	}
 }
 
-// TestCompressShortRetention verifies that with maxage < keepDays nothing is
-// archived: retention deletes old backups before they reach the 7-day window.
+// TestCompressShortRetention verifies archiving is skipped when maxage cannot
+// outlive the uncompressed window: nothing is packed just to be dropped.
 func TestCompressShortRetention(t *testing.T) {
-	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
-	w.SetMaxAge(4)
+	for _, maxage := range []int{keepDays, 0, -1} {
+		dir := t.TempDir()
+		w := newTestWriter(t, dir, testNow)
+		w.SetMaxAge(maxage)
+		w.SetCompress(true)
 
-	today := time.Now()
-	nameStale := createBackup(t, dir, "app", "five days old", today.AddDate(0, 0, -5))
-	nameInWindow := createBackup(t, dir, "app", "three days old", today.AddDate(0, 0, -3))
-	nameKept := createBackup(t, dir, "app", "two days old", today.AddDate(0, 0, -2))
-	w.compress = true // set directly; SetCompress only toggles the flag
-	w.sweep()
+		stale := createBackup(t, dir, "app", "nine days old", testNow.AddDate(0, 0, -9))
+		w.sweep()
 
-	// No archive of any kind should exist.
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("readdir failed: %v", err)
-	}
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), archiveSuffix) {
-			t.Fatalf("no archive expected with maxage < keepDays, found: %s", e.Name())
+		if n := countArchives(t, dir); n != 0 {
+			t.Fatalf("maxage=%d: archives = %d, want 0", maxage, n)
 		}
-	}
-	// The 5-days-old backup is removed by retention, not compression.
-	if _, err := os.Stat(filepath.Join(dir, nameStale)); !os.IsNotExist(err) {
-		t.Fatalf("5-days-old file should be removed by retention, err=%v", err)
-	}
-	// Backups inside the uncompressed window stay as plain files.
-	if _, err := os.Stat(filepath.Join(dir, nameInWindow)); err != nil {
-		t.Fatalf("3-days-old file should stay plain: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, nameKept)); err != nil {
-		t.Fatalf("2-days-old file should stay plain: %v", err)
+		for _, name := range dirNames(t, dir) {
+			if strings.HasSuffix(name, ".tmp") {
+				t.Fatalf("maxage=%d: left a temp file: %s", maxage, name)
+			}
+		}
+		_, err := os.Stat(filepath.Join(dir, stale))
+		if maxage <= 0 {
+			if err != nil {
+				t.Fatalf("maxage=%d: retention disabled, backup should stay: %v", maxage, err)
+			}
+			continue
+		}
+		if !os.IsNotExist(err) {
+			t.Fatalf("maxage=%d: 9-days-old backup should expire, err=%v", maxage, err)
+		}
 	}
 }
 
 func TestCompressUsesLocalDateBoundary(t *testing.T) {
 	location := time.FixedZone("UTC-8", -8*60*60)
+	now := time.Date(2026, 3, 15, 10, 0, 0, 0, location)
 
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.loc = location
-	w.SetConsole(false)
-	defer w.Close()
+	w := newTestWriter(t, dir, now)
 	w.SetMaxAge(64)
 	w.SetCompress(true)
 
-	today := time.Now().In(location)
-	boundary := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, location).AddDate(0, 0, -keepDays)
-	older := boundary.AddDate(0, 0, -1)
-	nameBoundary := createBackup(t, dir, "app", "boundary day", boundary)
-	nameOlder := createBackup(t, dir, "app", "older day", older)
+	inWindow := createBackup(t, dir, "app", "six days old", now.AddDate(0, 0, -6))
+	older := createBackup(t, dir, "app", "seven days old", now.AddDate(0, 0, -7))
 
-	parsed, err := w.name2time(nameBoundary)
+	parsed, kind, err := w.pasename(older)
 	if err != nil {
 		t.Fatalf("parse local backup timestamp: %v", err)
 	}
 	if parsed.Location() != location {
 		t.Fatalf("backup timestamp location = %v, want %v", parsed.Location(), location)
 	}
-	parsedArchive, err := w.archive2time("app." + boundary.Format("2006-01-02") + archiveSuffix)
-	if err != nil {
-		t.Fatalf("parse local archive date: %v", err)
-	}
-	if parsedArchive.Location() != location {
-		t.Fatalf("archive date location = %v, want %v", parsedArchive.Location(), location)
+	if kind != kindBackup {
+		t.Fatalf("kind = %v, want kindBackup", kind)
 	}
 
 	w.sweep()
-	if _, err := os.Stat(filepath.Join(dir, nameBoundary)); err != nil {
-		t.Fatalf("boundary-day backup should remain uncompressed: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, inWindow)); err != nil {
+		t.Fatalf("six-days-old backup should stay plain: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, nameOlder)); !os.IsNotExist(err) {
-		t.Fatalf("older backup should be archived, err=%v", err)
+	if _, err := os.Stat(filepath.Join(dir, older)); !os.IsNotExist(err) {
+		t.Fatalf("seven-days-old backup should be archived, err=%v", err)
 	}
-	archive := filepath.Join(dir, "app."+older.Format("2006-01-02")+archiveSuffix)
+	archive := filepath.Join(dir, archiveName(now.AddDate(0, 0, -7), now))
 	if _, err := os.Stat(archive); err != nil {
-		t.Fatalf("older-day archive missing: %v", err)
+		t.Fatalf("archive missing: %v", err)
 	}
 }
 
-// TestDeleteArchives verifies archives beyond maxage are removed.
-func TestDeleteArchives(t *testing.T) {
+// TestCompressCrossMonthYear checks the day window across a year boundary.
+func TestCompressCrossMonthYear(t *testing.T) {
+	now := time.Date(2027, 1, 2, 0, 0, 30, 0, testLoc)
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
-	w.SetMaxAge(7)
+	w := newTestWriter(t, dir, now)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
 
-	oldArchive := filepath.Join(dir, "app."+time.Now().AddDate(0, 0, -30).Format("2006-01-02")+".tar.gz")
-	if err := os.WriteFile(oldArchive, []byte("stub"), 0o644); err != nil {
-		t.Fatalf("create old archive failed: %v", err)
-	}
-	freshArchive := filepath.Join(dir, "app."+time.Now().AddDate(0, 0, -3).Format("2006-01-02")+".tar.gz")
-	if err := os.WriteFile(freshArchive, []byte("stub"), 0o644); err != nil {
-		t.Fatalf("create fresh archive failed: %v", err)
-	}
+	december := time.Date(2026, 12, 20, 23, 59, 59, 0, testLoc)
+	inWindow := time.Date(2026, 12, 27, 0, 0, 0, 0, testLoc) // exactly keepDays-1 back
+	oldName := createBackup(t, dir, "app", "december", december)
+	keepName := createBackup(t, dir, "app", "in window", inWindow)
 
-	w.delete(w.maxage)
-	if _, err := os.Stat(oldArchive); !os.IsNotExist(err) {
-		t.Fatalf("expired archive should be deleted, err=%v", err)
+	w.sweep()
+	archive := filepath.Join(dir, "app.2026-12-20-000030.tar.gz")
+	if _, err := os.Stat(archive); err != nil {
+		t.Fatalf("december archive missing: %v", err)
 	}
-	if _, err := os.Stat(freshArchive); err != nil {
-		t.Fatalf("fresh archive should be kept: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, oldName)); !os.IsNotExist(err) {
+		t.Fatalf("december backup should be archived, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, keepName)); err != nil {
+		t.Fatalf("in-window backup should stay plain: %v", err)
 	}
 }
 
-// TestCompressTempCleanup verifies a failed archive leaves no temp file and
-// keeps its sources intact.
+// TestCompressDSTBoundary checks the window on a DST transition day.
+func TestCompressDSTBoundary(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("tzdata unavailable: %v", err)
+	}
+	now := time.Date(2026, 3, 9, 12, 0, 0, 0, loc) // DST started 2026-03-08
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, now)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
+
+	old := time.Date(2026, 3, 1, 23, 30, 0, 0, loc)
+	keep := time.Date(2026, 3, 3, 0, 30, 0, 0, loc)
+	createBackup(t, dir, "app", "before dst", old)
+	keepName := createBackup(t, dir, "app", "in window", keep)
+
+	w.sweep()
+	if _, err := os.Stat(filepath.Join(dir, "app.2026-03-01-120000.tar.gz")); err != nil {
+		t.Fatalf("pre-DST day should be archived: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, keepName)); err != nil {
+		t.Fatalf("in-window backup should stay plain: %v", err)
+	}
+}
+
+// TestDeleteUnifiedDayBoundary verifies backups and archives share one
+// retention rule: a file goes away once its whole day ends before
+// now-maxage, so removal is at most one day late and never early.
+func TestDeleteUnifiedDayBoundary(t *testing.T) {
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, testNow) // 2026-03-15 10:00, maxage=10 -> deadline 2026-03-05 10:00
+	const maxage = 10
+
+	insideDay := time.Date(2026, 3, 5, 0, 0, 0, 0, testLoc)
+	outsideDay := time.Date(2026, 3, 4, 0, 0, 0, 0, testLoc)
+	inside := []string{
+		createBackup(t, dir, "app", "start of deadline day", insideDay),
+		createBackup(t, dir, "app", "end of deadline day", insideDay.Add(23*time.Hour+59*time.Minute+59*time.Second)),
+		"app.2026-03-05-093000.tar.gz",
+	}
+	outside := []string{
+		createBackup(t, dir, "app", "start of previous day", outsideDay),
+		createBackup(t, dir, "app", "end of previous day", outsideDay.Add(23*time.Hour+59*time.Minute+59*time.Second)),
+		"app.2026-03-04-235959.tar.gz",
+	}
+	for _, name := range inside {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("keep"), 0o644); err != nil {
+			t.Fatalf("create %s failed: %v", name, err)
+		}
+	}
+	for _, name := range outside {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("drop"), 0o644); err != nil {
+			t.Fatalf("create %s failed: %v", name, err)
+		}
+	}
+
+	w.delete(maxage)
+
+	for _, name := range inside {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("%s is inside retention and must survive: %v", name, err)
+		}
+	}
+	for _, name := range outside {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s is past retention and must be removed, err=%v", name, err)
+		}
+	}
+}
+
+// TestCompressTempCleanup verifies a failed archive keeps its sources intact.
 func TestCompressTempCleanup(t *testing.T) {
 	dir := t.TempDir()
-	w := New(filepath.Join(dir, "app.log"))
-	w.SetConsole(false)
-	defer w.Close()
+	w := newTestWriter(t, dir, testNow)
 	w.SetMaxAge(64)
+	w.SetCompress(true)
 
-	today := time.Now()
-	name := createBackup(t, dir, "app", "old data", today.AddDate(0, 0, -9))
-	// Pre-create the .tmp target as a directory so os.Create fails.
-	if err := os.Mkdir(filepath.Join(dir, "app."+today.AddDate(0, 0, -9).Format("2006-01-02")+".tar.gz.tmp"), 0o755); err != nil {
+	day := testNow.AddDate(0, 0, -9)
+	name := createBackup(t, dir, "app", "old data", day)
+	// Pre-create the temp target as a directory so os.Create fails.
+	if err := os.Mkdir(w.tmppath(day), 0o755); err != nil {
 		t.Fatalf("mkdir stub failed: %v", err)
 	}
 
 	w.sweep()
-	entries, _ := os.ReadDir(dir)
-	for _, e := range entries {
-		if e.IsDir() && strings.HasSuffix(e.Name(), ".tmp") {
-			continue // the stub directory itself
-		}
-		if strings.HasSuffix(e.Name(), ".tar.gz") {
-			t.Fatalf("archive created despite failure: %s", e.Name())
-		}
+	if n := countArchives(t, dir); n != 0 {
+		t.Fatalf("archive created despite failure: %d", n)
 	}
 	if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 		t.Fatalf("source must survive failed archive: %v", err)
+	}
+}
+
+// TestCompressStaleTempCleanup verifies temp files left by an interrupted
+// attempt are dropped once the day is already archived.
+func TestCompressStaleTempCleanup(t *testing.T) {
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, testNow)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
+
+	day := testNow.AddDate(0, 0, -9)
+	archive := filepath.Join(dir, archiveName(day, testNow))
+	if err := os.WriteFile(archive, []byte("stub"), 0o644); err != nil {
+		t.Fatalf("create archive stub failed: %v", err)
+	}
+	tmp := w.tmppath(day)
+	if err := os.WriteFile(tmp, []byte("partial"), 0o644); err != nil {
+		t.Fatalf("create temp stub failed: %v", err)
+	}
+
+	w.sweep()
+	if _, err := os.Stat(tmp); !os.IsNotExist(err) {
+		t.Fatalf("stale temp file should be removed, err=%v", err)
+	}
+	if _, err := os.Stat(archive); err != nil {
+		t.Fatalf("existing archive must be kept: %v", err)
+	}
+}
+
+// TestCompressLateBackupKeepsArchive verifies a backup that shows up for an
+// already archived day stays plain and never rewrites the archive.
+func TestCompressLateBackupKeepsArchive(t *testing.T) {
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, testNow)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
+
+	day := testNow.AddDate(0, 0, -9)
+	createBackup(t, dir, "app", "first", day)
+	w.sweep()
+
+	archive := filepath.Join(dir, archiveName(day, testNow))
+	got := readArchive(t, archive)
+	if len(got) != 1 {
+		t.Fatalf("archive should hold one entry, got %v", got)
+	}
+
+	// A stale-mtime restart can produce a new backup for the same old day.
+	setNow(w, testNow.Add(5*time.Minute))
+	late := createBackup(t, dir, "app", "late", day.Add(time.Hour))
+	w.sweep()
+
+	if n := countArchives(t, dir); n != 1 {
+		t.Fatalf("archives after late backup = %d, want 1: %v", n, dirNames(t, dir))
+	}
+	if got := readArchive(t, archive); len(got) != 1 || got[wantKeyFor(day)] != "first" {
+		t.Fatalf("archive must not be rewritten: %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, late)); err != nil {
+		t.Fatalf("late backup should stay plain until retention: %v", err)
+	}
+}
+
+// wantKeyFor returns the tar entry name of the first backup created for day.
+func wantKeyFor(day time.Time) string {
+	return "app" + day.Format(nameLayout) + ".log"
+}
+
+// TestCompressArchivePathBlocked verifies a blocked archive path never costs
+// any log data.
+func TestCompressArchivePathBlocked(t *testing.T) {
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, testNow)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
+
+	day := testNow.AddDate(0, 0, -9)
+	name := createBackup(t, dir, "app", "must survive", day)
+	blocked := filepath.Join(dir, archiveName(day, testNow))
+	if err := os.Mkdir(blocked, 0o755); err != nil {
+		t.Fatalf("create blocking directory failed: %v", err)
+	}
+
+	w.sweep()
+	if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+		t.Fatalf("source must survive a blocked archive path: %v", err)
+	}
+}
+
+// TestConcurrentWritesWithSweeps verifies concurrent day-crossing writes and
+// sweeps stay race-free and still keep exactly one archive per day.
+func TestConcurrentWritesWithSweeps(t *testing.T) {
+	dir := t.TempDir()
+	w := newTestWriter(t, dir, testNow)
+	w.SetMaxAge(64)
+	w.SetCompress(true)
+
+	oldDay := testNow.AddDate(0, 0, -9)
+	for i := 0; i < 5; i++ {
+		createBackup(t, dir, "app", "old payload", oldDay.Add(time.Duration(i)*time.Minute))
+	}
+
+	errCh := make(chan error, 512)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			date := "2026-03-15"
+			if i%2 == 1 {
+				date = "2026-03-14"
+			}
+			line := []byte("time=" + date + "T00:00:00 concurrent\n")
+			for j := 0; j < 40; j++ {
+				if _, err := w.Write(line); err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}(i)
+	}
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				w.sweep()
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent write failed: %v", err)
+	}
+	if err := w.flush(); err != nil {
+		t.Fatalf("flush failed: %v", err)
+	}
+
+	if n := countArchives(t, dir); n != 1 {
+		t.Fatalf("archives = %d, want 1: %v", n, dirNames(t, dir))
+	}
+	got := readArchive(t, filepath.Join(dir, archiveName(oldDay, testNow)))
+	if len(got) != 5 {
+		t.Fatalf("archive entries = %d, want 5: %v", len(got), got)
 	}
 }
 

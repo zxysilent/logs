@@ -59,8 +59,8 @@ func BenchmarkRotate(b *testing.B) {
 	}
 }
 
-// BenchmarkName2time measures date extraction from backup filenames.
-func BenchmarkName2time(b *testing.B) {
+// BenchmarkPasename measures date extraction from managed filenames.
+func BenchmarkPasename(b *testing.B) {
 	w := New(filepath.Join(b.TempDir(), "app.log"))
 	w.SetConsole(false)
 	defer w.Close()
@@ -68,6 +68,6 @@ func BenchmarkName2time(b *testing.B) {
 	name := "app.2025-06-15-120000.log"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = w.name2time(name)
+		_, _, _ = w.pasename(name)
 	}
 }

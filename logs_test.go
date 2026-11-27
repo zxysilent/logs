@@ -1,7 +1,9 @@
 package logs
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -262,17 +264,58 @@ func TestNewFileCompressOption(t *testing.T) {
 		t.Fatalf("second write failed: %v", err)
 	}
 
-	// The sweep runs asynchronously; wait for the archive.
-	archive := filepath.Join(dir, "app."+oldDay.Format("2006-01-02")+".tar.gz")
-	deadline := time.Now().Add(2 * time.Second)
+	// The sweep runs asynchronously; wait for the archive. Its name carries the
+	// archived date plus the moment the sweep ran, so match the pattern.
+	pattern := filepath.Join(dir, "app.*.tar.gz")
+	var archives []string
+	deadline := time.Now().Add(10 * time.Second)
 	for {
-		if _, err := os.Stat(archive); err == nil {
-			return
+		archives, _ = filepath.Glob(pattern)
+		if len(archives) > 0 {
+			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("archive not created after day-crossing write: %s", archive)
+			t.Fatalf("archive not created after day-crossing write: %s", pattern)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if len(archives) != 1 {
+		t.Fatalf("expected one archive, got %v", archives)
+	}
+	want := "app." + oldDay.Format("2006-01-02-150405") + ".log"
+	if entries := readTarGz(t, archives[0]); entries[want] != "legacy line" {
+		t.Fatalf("archive %s missing %s: %v", filepath.Base(archives[0]), want, entries)
+	}
+}
+
+// readTarGz extracts a tar.gz into name -> content.
+func readTarGz(t *testing.T, path string) map[string]string {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open archive failed: %v", err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("gzip reader failed: %v", err)
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	out := map[string]string{}
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return out
+		}
+		if err != nil {
+			t.Fatalf("tar reader failed: %v", err)
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatalf("read %s failed: %v", hdr.Name, err)
+		}
+		out[hdr.Name] = string(data)
 	}
 }
 
